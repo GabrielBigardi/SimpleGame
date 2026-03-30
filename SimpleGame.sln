@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleGame", "SimpleGame\SimpleGame.csproj", "{11BB7976-94D7-46CD-984D-21147FC1D939}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleGameContentBuilder", "SimpleGameContentBuilder\SimpleGameContentBuilder.csproj", "{4E714B16-E32E-4621-B5E8-B16657DDF695}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{11BB7976-94D7-46CD-984D-21147FC1D939}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11BB7976-94D7-46CD-984D-21147FC1D939}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11BB7976-94D7-46CD-984D-21147FC1D939}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11BB7976-94D7-46CD-984D-21147FC1D939}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E714B16-E32E-4621-B5E8-B16657DDF695}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E714B16-E32E-4621-B5E8-B16657DDF695}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E714B16-E32E-4621-B5E8-B16657DDF695}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E714B16-E32E-4621-B5E8-B16657DDF695}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
