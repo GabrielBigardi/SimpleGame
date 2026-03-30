@@ -12,6 +12,9 @@ public static class AssetManager
     public static Texture2D Player;
     public static Effect Shader;
     
+    public static Texture2D LightGradientTexture;
+    public static Texture2D GameWorldTexture;
+    
     public static bool NeedsReload { get; private set; }
 
     private static T Load<T>(string path) where T : class
@@ -36,6 +39,8 @@ public static class AssetManager
     {
         _content = content;
         Player = Load<Texture2D>("Sprites/test");
+        LightGradientTexture  = Load<Texture2D>("Sprites/LightGradient");
+        GameWorldTexture = Load<Texture2D>("Sprites/GameWorld");
         Shader = Load<Effect>("Shaders/test");
     }
     
