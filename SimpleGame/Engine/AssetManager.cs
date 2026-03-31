@@ -40,7 +40,7 @@ public static class AssetManager
         _content = content;
         Player = Load<Texture2D>("Sprites/test");
         LightGradientTexture  = Load<Texture2D>("Sprites/LightGradient");
-        GameWorldTexture = Load<Texture2D>("Sprites/GameWorld");
+        GameWorldTexture = Load<Texture2D>("Sprites/409");
         Shader = Load<Effect>("Shaders/test");
     }
     
@@ -54,7 +54,6 @@ public static class AssetManager
         // The assets directory to be watched, this is working fine
         var projectDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../"));
         var assetsDir = Path.Combine(projectDir, "../SimpleGameContentBuilder/Assets");
-        //var assetsDir = @"C:\Users\Gabriel\RiderProjects\SimpleGame\SimpleGameContentBuilder\Assets";
 
         var watcher = new FileSystemWatcher
         {
