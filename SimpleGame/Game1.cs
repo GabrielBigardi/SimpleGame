@@ -16,19 +16,29 @@ public class Game1 : Game
     private Sprite _lightB;
 
     private RenderTarget2D _lightMaskTarget;
+    private Vector2 _mousePos;
+
+    private Color _currentLighting = Color.Black;
+    private float _currentTime;
 
     private readonly BlendState _lightCarveBlend = new()
     {
-        ColorBlendFunction = BlendFunction.ReverseSubtract,
         ColorSourceBlend = Blend.SourceAlpha,
-        ColorDestinationBlend = Blend.One
+        ColorDestinationBlend = Blend.InverseSourceAlpha,
+        AlphaSourceBlend =  Blend.SourceAlpha,
+        AlphaDestinationBlend = Blend.InverseSourceAlpha,
+        ColorBlendFunction = BlendFunction.ReverseSubtract,
+        AlphaBlendFunction =  BlendFunction.Add,
     };
 
     private readonly BlendState _lightingBlend = new()
     {
-        ColorBlendFunction = BlendFunction.ReverseSubtract,
         ColorSourceBlend = Blend.SourceColor,
-        ColorDestinationBlend = Blend.One
+        ColorDestinationBlend = Blend.One,
+        AlphaSourceBlend =  Blend.One,
+        AlphaDestinationBlend = Blend.Zero,
+        ColorBlendFunction = BlendFunction.ReverseSubtract,
+        AlphaBlendFunction =  BlendFunction.Add,
     };
 
     public Game1()
@@ -61,7 +71,7 @@ public class Game1 : Game
         _lightA = new Sprite(
             AssetManager.LightGradientTexture,
             new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f),
-            Vector2.One * 2f);
+            Vector2.One * 4f);
         
         _lightB = new Sprite(
             AssetManager.LightGradientTexture,
@@ -86,6 +96,16 @@ public class Game1 : Game
 
         _lightA.Position = _player.Position;
 
+        _mousePos = Mouse.GetState().Position.ToVector2();
+
+        _currentTime += (float)gameTime.ElapsedGameTime.TotalSeconds * 0.1f;
+        _currentTime %= 2f;
+        var baseIntensity = _currentTime <= 1f ? _currentTime : 2f - _currentTime;
+        var maxLighting = 0.8f;
+        var finalIntensity = baseIntensity * maxLighting;
+        _currentLighting = new Color(finalIntensity, finalIntensity, 0f, finalIntensity);
+        //_currentLighting = new Color(1f, 1f, 0f, 1f);
+
         base.Update(gameTime);
     }
 
@@ -94,15 +114,13 @@ public class Game1 : Game
         // Draw subtraction color to light mask
         {
             GraphicsDevice.SetRenderTarget(_lightMaskTarget);
-
-            var ambientSubtractionColor = new Color(180, 180, 0);
-            GraphicsDevice.Clear(ambientSubtractionColor);
+            GraphicsDevice.Clear(_currentLighting);
         }
 
         // Carve lights from light mask
         {
             _spriteBatch.Begin(SpriteSortMode.Deferred, _lightCarveBlend, SamplerState.PointClamp);
-            _spriteBatch.Draw(_lightA.Texture, _lightA.Position, null, Color.White, _lightA.Rotation, _lightA.CenterOrigin, _lightA.Scale, SpriteEffects.None, 0f);
+            _spriteBatch.Draw(_lightA.Texture, _mousePos, null, Color.White, _lightA.Rotation, _lightA.CenterOrigin, _lightA.Scale, SpriteEffects.None, 0f);
             _spriteBatch.Draw(_lightB.Texture, _lightB.Position, null, Color.Orange, _lightB.Rotation, _lightB.CenterOrigin, _lightB.Scale, SpriteEffects.None, 0f);
             _spriteBatch.End();
         }
