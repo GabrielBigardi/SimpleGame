@@ -40,7 +40,7 @@ public static class AssetManager
         _content = content;
         Player = Load<Texture2D>("Sprites/test");
         LightGradientTexture  = Load<Texture2D>("Sprites/LightGradient");
-        GameWorldTexture = Load<Texture2D>("Sprites/409");
+        GameWorldTexture = Load<Texture2D>("Sprites/stardewunlighted");
         Shader = Load<Effect>("Shaders/test");
     }
     

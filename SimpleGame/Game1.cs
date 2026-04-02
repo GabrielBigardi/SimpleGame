@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -10,36 +10,16 @@ public class Game1 : Game
 {
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
-
-    private Sprite _player;
-    private Sprite _lightA;
-    private Sprite _lightB;
-
+    
     private RenderTarget2D _lightMaskTarget;
-    private Vector2 _mousePos;
 
-    private Color _currentLighting = Color.Black;
-    private float _currentTime;
-
-    private readonly BlendState _lightCarveBlend = new()
-    {
-        ColorSourceBlend = Blend.SourceAlpha,
-        ColorDestinationBlend = Blend.InverseSourceAlpha,
-        AlphaSourceBlend =  Blend.SourceAlpha,
-        AlphaDestinationBlend = Blend.InverseSourceAlpha,
-        ColorBlendFunction = BlendFunction.ReverseSubtract,
-        AlphaBlendFunction =  BlendFunction.Add,
-    };
-
-    private readonly BlendState _lightingBlend = new()
-    {
-        ColorSourceBlend = Blend.SourceColor,
-        ColorDestinationBlend = Blend.One,
-        AlphaSourceBlend =  Blend.One,
-        AlphaDestinationBlend = Blend.Zero,
-        ColorBlendFunction = BlendFunction.ReverseSubtract,
-        AlphaBlendFunction =  BlendFunction.Add,
-    };
+    private PhysicsSprite _player;
+    private Sprite _playerLight;
+    
+    private PhysicsSprite _playerB;
+    private Sprite _playerBLight;
+    
+    private readonly List<LightSource> _lightSources = new();
 
     public Game1()
     {
@@ -58,25 +38,46 @@ public class Game1 : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
 
-        var pp = GraphicsDevice.PresentationParameters;
-        _lightMaskTarget = new RenderTarget2D(GraphicsDevice, pp.BackBufferWidth, pp.BackBufferHeight);
+        var presentationParameters = GraphicsDevice.PresentationParameters;
+        _lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth, presentationParameters.BackBufferHeight);
 
         AssetManager.Load(Content);
+#if DEBUG
+        AssetManager.InitializeHotReload();
+#endif
 
-        _player = new Sprite(
+        _player = new PhysicsSprite(
             AssetManager.Player,
-            new Vector2(_graphics.PreferredBackBufferWidth / 2f,  _graphics.PreferredBackBufferHeight / 2f),
-            Vector2.One);
-
-        _lightA = new Sprite(
+            new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f),
+            Vector2.One, new Vector2(64, 120));
+        
+        _playerLight = new Sprite(
             AssetManager.LightGradientTexture,
             new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f),
-            Vector2.One * 4f);
+            Vector2.One * 3f);
         
-        _lightB = new Sprite(
+        _playerB = new PhysicsSprite(
+            AssetManager.Player,
+            new Vector2(_graphics.PreferredBackBufferWidth / 2f + 300,  _graphics.PreferredBackBufferHeight / 2f + 200),
+            Vector2.One, new Vector2(64, 120));
+        
+        _playerBLight = new Sprite(
             AssetManager.LightGradientTexture,
-            new Vector2(_graphics.PreferredBackBufferWidth / 2f + 300f, _graphics.PreferredBackBufferHeight / 2f + 300f),
-            Vector2.One);
+            new Vector2(_graphics.PreferredBackBufferWidth / 2f + 300, _graphics.PreferredBackBufferHeight / 2f + 200),
+            Vector2.One * 3f);
+        
+        _lightSources.Add(new LightSource() { Sprite = new Sprite(
+            AssetManager.LightGradientTexture,
+            new Vector2(870, 380),
+            Vector2.One * 3f)});
+        
+        _lightSources.Add(new LightSource() { Sprite = new Sprite(
+            AssetManager.LightGradientTexture,
+            new Vector2(440, 190),
+            Vector2.One * 3f)});
+        
+        _lightSources.Add(new LightSource() { Sprite = _playerLight});
+        _lightSources.Add(new LightSource() { Sprite = _playerBLight});
     }
 
     protected override void Update(GameTime gameTime)
@@ -85,67 +86,81 @@ public class Game1 : Game
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
         
-        var horizontal = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Right) || Keyboard.GetState().IsKeyDown(Keys.D)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Left) || Keyboard.GetState().IsKeyDown(Keys.A));
-        var vertical =  Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Down) || Keyboard.GetState().IsKeyDown(Keys.S)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Up) || Keyboard.GetState().IsKeyDown(Keys.W));
-        var movement = new Vector2(horizontal, vertical);
+        TimeManager.Update(gameTime);
+        InputManager.Update();
+        DayTimeManager.Update(TimeManager.DeltaTime);
 
-        if (movement != Vector2.Zero)
-            movement.Normalize();
+#if DEBUG
+        if (AssetManager.NeedsReload)
+        {
+            AssetManager.PerformReload();
+            _player.Texture = AssetManager.Player;
+            _playerB.Texture = AssetManager.Player;
+            
+            foreach (var lightSource in _lightSources)
+                lightSource.Sprite.Texture = AssetManager.LightGradientTexture;
+        }
+#endif
         
-        _player.Position += movement * 200f * (float)gameTime.ElapsedGameTime.TotalSeconds;
-
-        _lightA.Position = _player.Position;
-
-        _mousePos = Mouse.GetState().Position.ToVector2();
-
-        _currentTime += (float)gameTime.ElapsedGameTime.TotalSeconds * 0.1f;
-        _currentTime %= 2f;
-        var baseIntensity = _currentTime <= 1f ? _currentTime : 2f - _currentTime;
-        var maxLighting = 0.8f;
-        var finalIntensity = baseIntensity * maxLighting;
-        _currentLighting = new Color(finalIntensity, finalIntensity, 0f, finalIntensity);
-        //_currentLighting = new Color(1f, 1f, 0f, 1f);
+        _player.Position += InputManager.NormalizedInput * 200f * TimeManager.DeltaTime;
+        _playerLight.Position = _player.Position;
+        _playerBLight.Position = _playerB.Position;
 
         base.Update(gameTime);
     }
 
     protected override void Draw(GameTime gameTime)
     {
-        // Draw subtraction color to light mask
+        var collisionColor = _player.CollidesWith(_playerB)
+            ? Color.Red
+            : Color.Lime;
+        
+        // Lightmask (clear to subtraction color and carve lights)
         {
             GraphicsDevice.SetRenderTarget(_lightMaskTarget);
-            GraphicsDevice.Clear(_currentLighting);
-        }
-
-        // Carve lights from light mask
-        {
-            _spriteBatch.Begin(SpriteSortMode.Deferred, _lightCarveBlend, SamplerState.PointClamp);
-            _spriteBatch.Draw(_lightA.Texture, _mousePos, null, Color.White, _lightA.Rotation, _lightA.CenterOrigin, _lightA.Scale, SpriteEffects.None, 0f);
-            _spriteBatch.Draw(_lightB.Texture, _lightB.Position, null, Color.Orange, _lightB.Rotation, _lightB.CenterOrigin, _lightB.Scale, SpriteEffects.None, 0f);
+            GraphicsDevice.Clear(DayTimeManager.CurrentLighting);
+            
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightCarveBlend, SamplerState.PointClamp);
+            
+            foreach (var lightSource in _lightSources)
+                lightSource.Draw(_spriteBatch);
+            
             _spriteBatch.End();
         }
-
+        
         // Draw the real game
         {
             GraphicsDevice.SetRenderTarget(null);
             GraphicsDevice.Clear(Color.Black);
 
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend);
-            _spriteBatch.Draw(AssetManager.GameWorldTexture, Vector2.Zero,
-                new Rectangle(0, 0, AssetManager.GameWorldTexture.Width, AssetManager.GameWorldTexture.Height), Color.White,
-                0f, Vector2.Zero, 1f, SpriteEffects.None, 0f);
+            AssetManager.Shader.Parameters["TexelSize"].SetValue(new Vector2(1f / AssetManager.Player.Width, 1f / AssetManager.Player.Height));
+            AssetManager.Shader.Parameters["IncludeCorners"].SetValue(0f);
+            AssetManager.Shader.Parameters["OutlineColor"].SetValue(collisionColor.ToVector4());
+
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, effect: AssetManager.Shader);
             
+            _spriteBatch.Draw(AssetManager.GameWorldTexture, Vector2.Zero, new Rectangle(0, 0, AssetManager.GameWorldTexture.Width, AssetManager.GameWorldTexture.Height), Color.White, 0f, Vector2.Zero, 3f, SpriteEffects.None, 0f);
             _spriteBatch.Draw(_player.Texture, _player.Position, null, Color.White, _player.Rotation, _player.CenterOrigin, _player.Scale, SpriteEffects.None, 0f);
-            
+            _spriteBatch.Draw(_playerB.Texture, _playerB.Position, null, Color.White, _playerB.Rotation, _playerB.CenterOrigin, _playerB.Scale, SpriteEffects.None, 0f);
+
             _spriteBatch.End();
         }
 
         // Apply Stardew like blending
         {
-            _spriteBatch.Begin(SpriteSortMode.Deferred, _lightingBlend);
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightingBlend);
             _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, Color.White);
             _spriteBatch.End();
         }
+        
+#if DEBUG
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+
+        _spriteBatch.DrawRectangle(_player.Position - _player.ColliderSize / 2f, _player.ColliderSize, collisionColor, 2f);
+        _spriteBatch.DrawRectangle(_playerB.Position - _player.ColliderSize / 2f, _playerB.ColliderSize, collisionColor, 2f);
+
+        _spriteBatch.End();
+#endif
 
         base.Draw(gameTime);
     }
