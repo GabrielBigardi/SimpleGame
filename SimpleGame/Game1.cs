@@ -10,15 +10,22 @@ public class Game1 : Game
 {
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
-    
+
     private RenderTarget2D _lightMaskTarget;
 
     private PhysicsSprite _player;
     private Sprite _playerLight;
-    
+
     private PhysicsSprite _playerB;
     private Sprite _playerBLight;
-    
+
+    private Sprite _gameWorld;
+
+    private Vector2 ScreenCenter =>
+        new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
+
+    private readonly List<Sprite> _sprites = new();
+    private readonly List<PhysicsSprite> _physicsSprite = new();
     private readonly List<LightSource> _lightSources = new();
 
     public Game1()
@@ -39,45 +46,60 @@ public class Game1 : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
 
         var presentationParameters = GraphicsDevice.PresentationParameters;
-        _lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth, presentationParameters.BackBufferHeight);
+        _lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth,
+            presentationParameters.BackBufferHeight);
 
         AssetManager.Load(Content);
 #if DEBUG
         AssetManager.InitializeHotReload();
 #endif
+        _gameWorld = new Sprite(AssetManager.GameWorldTexture, ScreenCenter, Vector2.One * 3f);
 
         _player = new PhysicsSprite(
             AssetManager.Player,
-            new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f),
+            ScreenCenter,
             Vector2.One, new Vector2(64, 120));
-        
+
         _playerLight = new Sprite(
             AssetManager.LightGradientTexture,
-            new Vector2(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f),
+            ScreenCenter,
             Vector2.One * 3f);
-        
+
         _playerB = new PhysicsSprite(
             AssetManager.Player,
-            new Vector2(_graphics.PreferredBackBufferWidth / 2f + 300,  _graphics.PreferredBackBufferHeight / 2f + 200),
+            ScreenCenter + new Vector2(300, 200),
             Vector2.One, new Vector2(64, 120));
-        
+
         _playerBLight = new Sprite(
             AssetManager.LightGradientTexture,
-            new Vector2(_graphics.PreferredBackBufferWidth / 2f + 300, _graphics.PreferredBackBufferHeight / 2f + 200),
+            ScreenCenter + new Vector2(300, 200),
             Vector2.One * 3f);
         
-        _lightSources.Add(new LightSource() { Sprite = new Sprite(
-            AssetManager.LightGradientTexture,
-            new Vector2(870, 380),
-            Vector2.One * 3f)});
+        _sprites.Add(_gameWorld);
+        _sprites.Add(_player);
+        _sprites.Add(_playerB);
         
-        _lightSources.Add(new LightSource() { Sprite = new Sprite(
-            AssetManager.LightGradientTexture,
-            new Vector2(440, 190),
-            Vector2.One * 3f)});
-        
-        _lightSources.Add(new LightSource() { Sprite = _playerLight});
-        _lightSources.Add(new LightSource() { Sprite = _playerBLight});
+        _physicsSprite.Add(_player);
+        _physicsSprite.Add(_playerB);
+
+        _lightSources.Add(new LightSource()
+        {
+            Sprite = new Sprite(
+                AssetManager.LightGradientTexture,
+                new Vector2(870, 380),
+                Vector2.One * 3f)
+        });
+
+        _lightSources.Add(new LightSource()
+        {
+            Sprite = new Sprite(
+                AssetManager.LightGradientTexture,
+                new Vector2(440, 190),
+                Vector2.One * 3f)
+        });
+
+        _lightSources.Add(new LightSource() { Sprite = _playerLight });
+        _lightSources.Add(new LightSource() { Sprite = _playerBLight });
     }
 
     protected override void Update(GameTime gameTime)
@@ -85,7 +107,7 @@ public class Game1 : Game
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
-        
+
         TimeManager.Update(gameTime);
         InputManager.Update();
         DayTimeManager.Update(TimeManager.DeltaTime);
@@ -96,12 +118,12 @@ public class Game1 : Game
             AssetManager.PerformReload();
             _player.Texture = AssetManager.Player;
             _playerB.Texture = AssetManager.Player;
-            
+
             foreach (var lightSource in _lightSources)
                 lightSource.Sprite.Texture = AssetManager.LightGradientTexture;
         }
 #endif
-        
+
         _player.Position += InputManager.NormalizedInput * 200f * TimeManager.DeltaTime;
         _playerLight.Position = _player.Position;
         _playerBLight.Position = _playerB.Position;
@@ -114,34 +136,35 @@ public class Game1 : Game
         var collisionColor = _player.CollidesWith(_playerB)
             ? Color.Red
             : Color.Lime;
-        
+
         // Lightmask (clear to subtraction color and carve lights)
         {
             GraphicsDevice.SetRenderTarget(_lightMaskTarget);
             GraphicsDevice.Clear(DayTimeManager.CurrentLighting);
-            
+
             _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightCarveBlend, SamplerState.PointClamp);
-            
+
             foreach (var lightSource in _lightSources)
                 lightSource.Draw(_spriteBatch);
-            
+
             _spriteBatch.End();
         }
-        
+
         // Draw the real game
         {
             GraphicsDevice.SetRenderTarget(null);
             GraphicsDevice.Clear(Color.Black);
 
-            AssetManager.Shader.Parameters["TexelSize"].SetValue(new Vector2(1f / AssetManager.Player.Width, 1f / AssetManager.Player.Height));
+            AssetManager.Shader.Parameters["TexelSize"]
+                .SetValue(new Vector2(1f / AssetManager.Player.Width, 1f / AssetManager.Player.Height));
             AssetManager.Shader.Parameters["IncludeCorners"].SetValue(0f);
             AssetManager.Shader.Parameters["OutlineColor"].SetValue(collisionColor.ToVector4());
 
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp, effect: AssetManager.Shader);
-            
-            _spriteBatch.Draw(AssetManager.GameWorldTexture, Vector2.Zero, new Rectangle(0, 0, AssetManager.GameWorldTexture.Width, AssetManager.GameWorldTexture.Height), Color.White, 0f, Vector2.Zero, 3f, SpriteEffects.None, 0f);
-            _spriteBatch.Draw(_player.Texture, _player.Position, null, Color.White, _player.Rotation, _player.CenterOrigin, _player.Scale, SpriteEffects.None, 0f);
-            _spriteBatch.Draw(_playerB.Texture, _playerB.Position, null, Color.White, _playerB.Rotation, _playerB.CenterOrigin, _playerB.Scale, SpriteEffects.None, 0f);
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp,
+                effect: AssetManager.Shader);
+
+            foreach (var sprite in _sprites)
+                sprite.Draw(_spriteBatch);
 
             _spriteBatch.End();
         }
@@ -152,13 +175,13 @@ public class Game1 : Game
             _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, Color.White);
             _spriteBatch.End();
         }
-        
+
 #if DEBUG
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
 
-        _spriteBatch.DrawRectangle(_player.Position - _player.ColliderSize / 2f, _player.ColliderSize, collisionColor, 2f);
-        _spriteBatch.DrawRectangle(_playerB.Position - _player.ColliderSize / 2f, _playerB.ColliderSize, collisionColor, 2f);
-
+        foreach (var physicsSprite in _physicsSprite)
+            physicsSprite.DrawDebug(_spriteBatch, collisionColor);
+        
         _spriteBatch.End();
 #endif
 

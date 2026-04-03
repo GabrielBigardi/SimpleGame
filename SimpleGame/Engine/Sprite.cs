@@ -20,4 +20,9 @@ public class Sprite
         Scale = scale;
         Rotation = rotation;
     }
+
+    public void Draw(SpriteBatch spriteBatch)
+    {
+        spriteBatch.Draw(Texture, Position, null, ColorTint, Rotation, CenterOrigin, Scale, SpriteEffects.None, 0f);
+    }
 }
