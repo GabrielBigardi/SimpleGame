@@ -24,8 +24,10 @@ public static class InputManager
 
     public static void Update()
     {
-        var horizontal = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Right) || Keyboard.GetState().IsKeyDown(Keys.D)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Left) || Keyboard.GetState().IsKeyDown(Keys.A));
-        var vertical = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Down) || Keyboard.GetState().IsKeyDown(Keys.S)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Up) || Keyboard.GetState().IsKeyDown(Keys.W));
+        //var horizontal = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Right) || Keyboard.GetState().IsKeyDown(Keys.D)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Left) || Keyboard.GetState().IsKeyDown(Keys.A));
+        //var vertical = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Down) || Keyboard.GetState().IsKeyDown(Keys.S)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Up) || Keyboard.GetState().IsKeyDown(Keys.W));
+        var horizontal = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.D)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.A));
+        var vertical = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.S)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.W));
         RawInput = new Vector2(horizontal, vertical);
     }
 }

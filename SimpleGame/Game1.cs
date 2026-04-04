@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -58,7 +59,7 @@ public class Game1 : Game
         _player = new PhysicsSprite(
             AssetManager.Player,
             ScreenCenter,
-            Vector2.One, new Vector2(64, 120));
+            Vector2.One, new Vector2(64, 120-64), new Vector2(0,32));
 
         _playerLight = new Sprite(
             AssetManager.LightGradientTexture,
@@ -68,7 +69,7 @@ public class Game1 : Game
         _playerB = new PhysicsSprite(
             AssetManager.Player,
             ScreenCenter + new Vector2(300, 200),
-            Vector2.One, new Vector2(64, 120));
+            Vector2.One, new Vector2(64, 120-64), new Vector2(0,32));
 
         _playerBLight = new Sprite(
             AssetManager.LightGradientTexture,
@@ -124,8 +125,36 @@ public class Game1 : Game
         }
 #endif
 
-        _player.Position += InputManager.NormalizedInput * 200f * TimeManager.DeltaTime;
+        //_player.Position += InputManager.NormalizedInput * 200f * TimeManager.DeltaTime;
+        var velocity = InputManager.NormalizedInput * 200f * TimeManager.DeltaTime;
+
+        if (velocity.X > 0)
+            _player.FlipX = false;
+        
+        if (velocity.X < 0)
+            _player.FlipX = true;
+
+        _player.Move(velocity, _physicsSprite);
+        
+        
         _playerLight.Position = _player.Position;
+        
+        var horizontal = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Right)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Left));
+        var vertical = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Down)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Up));
+        var movement = new Vector2(horizontal, vertical);
+        
+        if (movement != Vector2.Zero)
+            movement.Normalize();
+        
+        if (movement.X > 0)
+            _playerB.FlipX = false;
+        
+        if (movement.X < 0)
+            _playerB.FlipX = true;
+
+        var playerBVelocity = movement * 200f * TimeManager.DeltaTime;
+        _playerB.Move(playerBVelocity, _physicsSprite);
+        
         _playerBLight.Position = _playerB.Position;
 
         base.Update(gameTime);
@@ -154,11 +183,6 @@ public class Game1 : Game
         {
             GraphicsDevice.SetRenderTarget(null);
             GraphicsDevice.Clear(Color.Black);
-
-            AssetManager.Shader.Parameters["TexelSize"]
-                .SetValue(new Vector2(1f / AssetManager.Player.Width, 1f / AssetManager.Player.Height));
-            AssetManager.Shader.Parameters["IncludeCorners"].SetValue(0f);
-            AssetManager.Shader.Parameters["OutlineColor"].SetValue(collisionColor.ToVector4());
 
             _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp,
                 effect: AssetManager.Shader);

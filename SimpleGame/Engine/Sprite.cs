@@ -12,7 +12,8 @@ public class Sprite
     public Vector2 CenterOrigin => new(Texture.Width / 2f, Texture.Height / 2f);
     public float Rotation;
     public Color ColorTint = Color.White;
-
+    public bool FlipX;
+    
     public Sprite(Texture2D texture, Vector2 position, Vector2 scale, float rotation = 0f)
     {
         Texture = texture;
@@ -23,6 +24,6 @@ public class Sprite
 
     public void Draw(SpriteBatch spriteBatch)
     {
-        spriteBatch.Draw(Texture, Position, null, ColorTint, Rotation, CenterOrigin, Scale, SpriteEffects.None, 0f);
+        spriteBatch.Draw(Texture, Position, null, ColorTint, Rotation, CenterOrigin, Scale, FlipX ? SpriteEffects.FlipHorizontally : SpriteEffects.None, 0f);
     }
 }

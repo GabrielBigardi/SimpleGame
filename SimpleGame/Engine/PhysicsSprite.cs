@@ -1,4 +1,6 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using System.Collections.Generic;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace SimpleGame.Engine;
@@ -17,15 +19,61 @@ public class PhysicsSprite : Sprite
 
     public bool CollidesWith(PhysicsSprite other)
     {
-        var myColliderPos = Position + _collisionOffset;
-        var otherColliderPos = other.Position + other._collisionOffset;
+        var myMin = Position - _colliderSize / 2f + _collisionOffset;
+        var myMax = myMin + _colliderSize;
 
-        return otherColliderPos.X < myColliderPos.X + _colliderSize.X &&
-               myColliderPos.X < otherColliderPos.X + other._colliderSize.X &&
-               otherColliderPos.Y < myColliderPos.Y + _colliderSize.Y &&
-               myColliderPos.Y < otherColliderPos.Y + other._colliderSize.Y;
+        var otherMin = other.Position - other._colliderSize / 2f + other._collisionOffset;
+        var otherMax = otherMin + other._colliderSize;
+
+        return myMin.X < otherMax.X &&
+               myMax.X > otherMin.X &&
+               myMin.Y < otherMax.Y &&
+               myMax.Y > otherMin.Y;
     }
+    
+    public void Move(Vector2 velocity, List<PhysicsSprite> others)
+    {
+        // Move X
+        Position.X += velocity.X;
+        ResolveCollisions(Vector2.UnitX, others);
 
+        // Move Y
+        Position.Y += velocity.Y;
+        ResolveCollisions(Vector2.UnitY, others);
+    }
+    
+    private void ResolveCollisions(Vector2 axis, List<PhysicsSprite> others)
+    {
+        foreach (var other in others)
+        {
+            if (other == this)
+                continue;
+
+            if (!CollidesWith(other))
+                continue;
+
+            var myCenter = Position + _collisionOffset;
+            var otherCenter = other.Position + other._collisionOffset;
+
+            var myHalf = _colliderSize / 2f;
+            var otherHalf = other._colliderSize / 2f;
+
+            var overlapX = (myHalf.X + otherHalf.X) - Math.Abs(myCenter.X - otherCenter.X);
+            var overlapY = (myHalf.Y + otherHalf.Y) - Math.Abs(myCenter.Y - otherCenter.Y);
+
+            if (axis.X != 0)
+            {
+                float direction = Math.Sign(myCenter.X - otherCenter.X);
+                Position.X += overlapX * direction;
+            }
+            else if (axis.Y != 0)
+            {
+                float direction = Math.Sign(myCenter.Y - otherCenter.Y);
+                Position.Y += overlapY * direction;
+            }
+        }
+    }
+    
     public void DrawDebug(SpriteBatch spriteBatch, Color color)
     {
         spriteBatch.DrawRectangle(Position - _colliderSize / 2f + _collisionOffset, _colliderSize, color, 2f);

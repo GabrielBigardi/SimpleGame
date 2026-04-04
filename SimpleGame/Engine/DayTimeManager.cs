@@ -17,6 +17,6 @@ public static class DayTimeManager
         var finalIntensity = baseIntensity * maxLighting;
         CurrentLighting = new Color(finalIntensity, finalIntensity, 0f, 255);
         
-        //CurrentLighting = new Color(220, 220, 0, 255);
+        //CurrentLighting = new Color(0,0, 0, 255);
     }
 }
