@@ -59,7 +59,7 @@ public class Game1 : Game
         _player = new PhysicsSprite(
             AssetManager.Player,
             ScreenCenter,
-            Vector2.One, new Vector2(64, 120-64), new Vector2(0,32));
+            Vector2.One * 0.75f, new Vector2(64, 120-64), new Vector2(0,32));
 
         _playerLight = new Sprite(
             AssetManager.LightGradientTexture,
@@ -69,7 +69,7 @@ public class Game1 : Game
         _playerB = new PhysicsSprite(
             AssetManager.Player,
             ScreenCenter + new Vector2(300, 200),
-            Vector2.One, new Vector2(64, 120-64), new Vector2(0,32));
+            Vector2.One * 0.75f, new Vector2(64, 120-64), new Vector2(0,32));
 
         _playerBLight = new Sprite(
             AssetManager.LightGradientTexture,

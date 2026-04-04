@@ -294,6 +294,50 @@ public static class Primitives2D
         }
 
         #endregion
+        
+        #region FillTriangle
+        public static void FillTriangle(this SpriteBatch spriteBatch, Vector2 p1, Vector2 p2, Vector2 p3, Color color)
+        {
+            // Simple (not super optimized) scanline approach
+            var minX = (int)MathF.Min(p1.X, MathF.Min(p2.X, p3.X));
+            var maxX = (int)MathF.Max(p1.X, MathF.Max(p2.X, p3.X));
+            var minY = (int)MathF.Min(p1.Y, MathF.Min(p2.Y, p3.Y));
+            var maxY = (int)MathF.Max(p1.Y, MathF.Max(p2.Y, p3.Y));
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    var p = new Vector2(x, y);
+
+                    // Barycentric check
+                    float d1 = Sign(p, p1, p2);
+                    float d2 = Sign(p, p2, p3);
+                    float d3 = Sign(p, p3, p1);
+
+                    bool hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                    bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+                    if (!(hasNeg && hasPos))
+                        spriteBatch.PutPixel(p, color);
+                }
+            }
+
+            static float Sign(Vector2 p1, Vector2 p2, Vector2 p3)
+            {
+                return (p1.X - p3.X) * (p2.Y - p3.Y) - (p2.X - p3.X) * (p1.Y - p3.Y);
+            }
+        }
+        #endregion
+        
+        #region DrawTriangle
+        public static void DrawTriangle(this SpriteBatch spriteBatch, Vector2 p1, Vector2 p2, Vector2 p3, Color color, float thickness = 1f)
+        {
+            spriteBatch.DrawLine(p1, p2, color, thickness);
+            spriteBatch.DrawLine(p2, p3, color, thickness);
+            spriteBatch.DrawLine(p3, p1, color, thickness);
+        }
+        #endregion
 
 
         #region DrawLine
