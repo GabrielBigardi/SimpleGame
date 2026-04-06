@@ -6,7 +6,14 @@ namespace SimpleGame.Engine;
 
 public class GameObject
 {
-    private List<Component> _components = new();
+    public Transform Transform;
+    
+    private readonly List<Component> _components = new();
+
+    public GameObject()
+    {
+        Transform = new Transform(this);
+    }
 
     public T AddComponent<T>() where T : Component, new()
     {

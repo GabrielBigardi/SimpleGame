@@ -6,10 +6,9 @@ public class LightSource : Component
 {
     public Transform Transform;
     public Sprite Sprite;
-    public float Intensity = 1f;
 
-    public override void Draw(SpriteBatch spriteBatch)
+    public void Draw(SpriteBatch spriteBatch, float intensity = 1f)
     {
-        spriteBatch.Draw(Sprite.Texture, Transform.Position, null, Sprite.ColorTint * Intensity, Transform.Rotation, Sprite.CenterOrigin, Transform.Scale, SpriteEffects.None, 0f);
+        spriteBatch.Draw(Sprite.Texture, Transform.Position, null, Sprite.ColorTint * intensity, Transform.Rotation, Sprite.CenterOrigin, Transform.Scale, SpriteEffects.None, 0f);
     }
 }
