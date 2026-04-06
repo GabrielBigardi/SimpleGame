@@ -331,11 +331,30 @@ public static class Primitives2D
         #endregion
         
         #region DrawTriangle
+        // public static void DrawTriangle(this SpriteBatch spriteBatch, Vector2 p1, Vector2 p2, Vector2 p3, Color color, float thickness = 1f)
+        // {
+        //     spriteBatch.DrawLine(p1, p2, color, thickness);
+        //     spriteBatch.DrawLine(p2, p3, color, thickness);
+        //     spriteBatch.DrawLine(p3, p1, color, thickness);
+        // }
         public static void DrawTriangle(this SpriteBatch spriteBatch, Vector2 p1, Vector2 p2, Vector2 p3, Color color, float thickness = 1f)
         {
+            // Draw the 3 lines (which leaves the corners looking broken)
             spriteBatch.DrawLine(p1, p2, color, thickness);
             spriteBatch.DrawLine(p2, p3, color, thickness);
             spriteBatch.DrawLine(p3, p1, color, thickness);
+
+            // THE FIX: Patch the corners (joints) if the line is thick
+            if (thickness > 1f)
+            {
+                var jointSize = new Vector2(thickness);
+                var offset = jointSize / 2f;
+
+                // Draw a tiny filled rectangle centered on each vertex to cover the gap
+                spriteBatch.FillRectangle(p1 - offset, jointSize, color);
+                spriteBatch.FillRectangle(p2 - offset, jointSize, color);
+                spriteBatch.FillRectangle(p3 - offset, jointSize, color);
+            }
         }
         #endregion
 
@@ -442,7 +461,7 @@ public static class Primitives2D
                              null,
                              color,
                              angle,
-                             Vector2.Zero,
+                             new Vector2(0, 0.5f),
                              new Vector2(length, thickness),
                              SpriteEffects.None,
                              0);

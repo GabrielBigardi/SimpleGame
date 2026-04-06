@@ -14,20 +14,33 @@ public class Game1 : Game
 
     private RenderTarget2D _lightMaskTarget;
 
-    private PhysicsSprite _player;
-    private Sprite _playerLight;
+    // private PhysicsBody _player;
+    // private Sprite _playerLight;
+    //
+    // private PhysicsBody _playerB;
+    // private Sprite _playerBLight;
+    //
+    // private Sprite _gameWorld;
 
-    private PhysicsSprite _playerB;
-    private Sprite _playerBLight;
+    private GameObject _gameWorld;
+    
+    private GameObject _player;
+    private GameObject _playerLight;
+    
+    private GameObject _playerB;
+    private GameObject _playerBLight;
 
-    private Sprite _gameWorld;
+    private List<GameObject> _gameObjects = new();
+    private List<GameObject> _worldObjects = new();
+    private List<GameObject> _lightSources = new();
+    private List<PhysicsBody> _physicsObjects = new();
 
     private Vector2 ScreenCenter =>
         new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
 
-    private readonly List<Sprite> _sprites = new();
-    private readonly List<PhysicsSprite> _physicsSprite = new();
-    private readonly List<LightSource> _lightSources = new();
+    // private readonly List<Sprite> _sprites = new();
+    // private readonly List<PhysicsBody> _physicsSprite = new();
+    // private readonly List<LightSource> _lightSources = new();
 
     public Game1()
     {
@@ -54,53 +67,65 @@ public class Game1 : Game
 #if DEBUG
         AssetManager.InitializeHotReload();
 #endif
-        _gameWorld = new Sprite(AssetManager.GameWorldTexture, ScreenCenter, Vector2.One * 3f);
+        _gameWorld = new GameObject();
+        var gameWorldTransform = _gameWorld.AddComponent<Transform>();
+        gameWorldTransform.Position = ScreenCenter;
+        gameWorldTransform.Scale = Vector2.One * 3f;
+        var gameWorldSprite = _gameWorld.AddComponent<Sprite>();
+        gameWorldSprite.Transform = gameWorldTransform;
+        gameWorldSprite.Texture = AssetManager.GameWorldTexture;
+        _gameObjects.Add(_gameWorld);
+        _worldObjects.Add(_gameWorld);
 
-        _player = new PhysicsSprite(
-            AssetManager.Player,
-            ScreenCenter,
-            Vector2.One * 0.75f, new Vector2(64, 120-64), new Vector2(0,32));
-
-        _playerLight = new Sprite(
-            AssetManager.LightGradientTexture,
-            ScreenCenter,
-            Vector2.One * 3f);
-
-        _playerB = new PhysicsSprite(
-            AssetManager.Player,
-            ScreenCenter + new Vector2(300, 200),
-            Vector2.One * 0.75f, new Vector2(64, 120-64), new Vector2(0,32));
-
-        _playerBLight = new Sprite(
-            AssetManager.LightGradientTexture,
-            ScreenCenter + new Vector2(300, 200),
-            Vector2.One * 3f);
+        _player = new GameObject();
+        var playerTransform = _player.AddComponent<Transform>();
+        playerTransform.Position = ScreenCenter;
+        playerTransform.Scale = Vector2.One;
+        var playerSprite = _player.AddComponent<Sprite>();
+        playerSprite.Transform = playerTransform;
+        playerSprite.Texture = AssetManager.Player;
+        var playerPhysics = _player.AddComponent<PhysicsBody>();
+        playerPhysics.Transform  = playerTransform;
+        playerPhysics.ColliderSize = new Vector2(64, 120 - 64);
+        playerPhysics.CollisionOffset = new Vector2(0, 32);
+        _physicsObjects.Add(playerPhysics);
+        _gameObjects.Add(_player);
+        _worldObjects.Add(_player);
         
-        _sprites.Add(_gameWorld);
-        _sprites.Add(_player);
-        _sprites.Add(_playerB);
+        _playerB = new GameObject();
+        var playerBTransform = _playerB.AddComponent<Transform>();
+        playerBTransform.Position = ScreenCenter;
+        playerBTransform.Scale = Vector2.One;
+        var playerBSprite = _playerB.AddComponent<Sprite>();
+        playerBSprite.Transform = playerBTransform;
+        playerBSprite.Texture = AssetManager.Player;
+        var playerBPhysics = _playerB.AddComponent<PhysicsBody>();
+        playerBPhysics.Transform  = playerBTransform;
+        playerBPhysics.ColliderSize = new Vector2(64, 120 - 64);
+        playerBPhysics.CollisionOffset = new Vector2(0, 32);
+        _physicsObjects.Add(playerBPhysics);
+        _gameObjects.Add(_playerB);
+        _worldObjects.Add(_playerB);
+
+        _playerLight = new GameObject();
+        var playerLightTransform = _playerLight.AddComponent<Transform>();
+        playerLightTransform.Position = ScreenCenter;
+        playerLightTransform.Scale = Vector2.One * 3f;
+        var playerLightSource  = _playerLight.AddComponent<LightSource>();
+        playerLightSource.Transform = playerLightTransform;
+        playerLightSource.Sprite = new Sprite { Transform =  playerLightTransform, Texture =  AssetManager.LightGradientTexture };
+        _gameObjects.Add(_playerLight);
+        _lightSources.Add(_playerLight);
         
-        _physicsSprite.Add(_player);
-        _physicsSprite.Add(_playerB);
-
-        _lightSources.Add(new LightSource()
-        {
-            Sprite = new Sprite(
-                AssetManager.LightGradientTexture,
-                new Vector2(870, 380),
-                Vector2.One * 3f)
-        });
-
-        _lightSources.Add(new LightSource()
-        {
-            Sprite = new Sprite(
-                AssetManager.LightGradientTexture,
-                new Vector2(440, 190),
-                Vector2.One * 3f)
-        });
-
-        _lightSources.Add(new LightSource() { Sprite = _playerLight });
-        _lightSources.Add(new LightSource() { Sprite = _playerBLight });
+        _playerBLight = new GameObject();
+        var playerBLightTransform = _playerBLight.AddComponent<Transform>();
+        playerBLightTransform.Position = ScreenCenter;
+        playerBLightTransform.Scale = Vector2.One * 3f;
+        var playerBLightSource  = _playerBLight.AddComponent<LightSource>();
+        playerBLightSource.Transform = playerBLightTransform;
+        playerBLightSource.Sprite = new Sprite { Transform =  playerBLightTransform, Texture =  AssetManager.LightGradientTexture };
+        _gameObjects.Add(_playerBLight);
+        _lightSources.Add(_playerBLight);
     }
 
     protected override void Update(GameTime gameTime)
@@ -113,58 +138,40 @@ public class Game1 : Game
         InputManager.Update();
         DayTimeManager.Update(TimeManager.DeltaTime);
 
+        foreach (var gameObject in _gameObjects)
+            gameObject.Update(TimeManager.DeltaTime);
+
 #if DEBUG
         if (AssetManager.NeedsReload)
         {
             AssetManager.PerformReload();
-            _player.Texture = AssetManager.Player;
-            _playerB.Texture = AssetManager.Player;
+            _player.GetComponent<Sprite>().Texture = AssetManager.Player;
 
             foreach (var lightSource in _lightSources)
-                lightSource.Sprite.Texture = AssetManager.LightGradientTexture;
+                lightSource.GetComponent<LightSource>().Sprite.Texture = AssetManager.LightGradientTexture;
         }
 #endif
-
-        //_player.Position += InputManager.NormalizedInput * 200f * TimeManager.DeltaTime;
         var velocity = InputManager.NormalizedInput * 200f * TimeManager.DeltaTime;
-
+        
         if (velocity.X > 0)
-            _player.FlipX = false;
+            _player.GetComponent<Sprite>().FlipX = false;
         
         if (velocity.X < 0)
-            _player.FlipX = true;
-
-        _player.Move(velocity, _physicsSprite);
+            _player.GetComponent<Sprite>().FlipX = true;
         
+        _player.GetComponent<PhysicsBody>().Move(velocity, _physicsObjects);
+        _playerLight.GetComponent<Transform>().Position = _player.GetComponent<Transform>().Position;
         
-        _playerLight.Position = _player.Position;
+        _playerBLight.GetComponent<Transform>().Position = _playerB.GetComponent<Transform>().Position;
         
-        var horizontal = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Right)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Left));
-        var vertical = Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Down)) - Convert.ToInt32(Keyboard.GetState().IsKeyDown(Keys.Up));
-        var movement = new Vector2(horizontal, vertical);
-        
-        if (movement != Vector2.Zero)
-            movement.Normalize();
-        
-        if (movement.X > 0)
-            _playerB.FlipX = false;
-        
-        if (movement.X < 0)
-            _playerB.FlipX = true;
-
-        var playerBVelocity = movement * 200f * TimeManager.DeltaTime;
-        _playerB.Move(playerBVelocity, _physicsSprite);
-        
-        _playerBLight.Position = _playerB.Position;
-
         base.Update(gameTime);
     }
 
     protected override void Draw(GameTime gameTime)
     {
-        var collisionColor = _player.CollidesWith(_playerB)
-            ? Color.Red
-            : Color.Lime;
+        // var collisionColor = _player.CollidesWith(_playerB)
+        //     ? Color.Red
+        //     : Color.Lime;
 
         // Lightmask (clear to subtraction color and carve lights)
         {
@@ -187,8 +194,8 @@ public class Game1 : Game
             _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp,
                 effect: AssetManager.Shader);
 
-            foreach (var sprite in _sprites)
-                sprite.Draw(_spriteBatch);
+            foreach (var worldObject in _worldObjects)
+                worldObject.Draw(_spriteBatch);
 
             _spriteBatch.End();
         }
@@ -203,9 +210,9 @@ public class Game1 : Game
 #if DEBUG
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
 
-        foreach (var physicsSprite in _physicsSprite)
-            physicsSprite.DrawDebug(_spriteBatch, collisionColor);
-        
+        foreach (var physicsObject in _physicsObjects)
+            physicsObject.DrawDebug(_spriteBatch, Color.Lime);
+
         _spriteBatch.End();
 #endif
 
