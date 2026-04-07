@@ -15,19 +15,19 @@ var contentCollectionArgs = new ContentBuilderParams()
     Mode = ContentBuilderMode.Builder,
     WorkingDirectory = $"{AppContext.BaseDirectory}../../../", // path to where your content folder can be located
     SourceDirectory = "Assets", // Not actually needed as this is the default, but added for reference
+#if DEBUG
     OutputDirectory = $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Debug/net9.0/",
+#else
+    OutputDirectory = $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Release/net9.0/",
+#endif
     Platform = TargetPlatform.DesktopGL
 };
 var builder = new Builder();
 
 if (args is not null && args.Length > 0)
-{
     builder.Run(args);
-}
 else
-{
     builder.Run(contentCollectionArgs);
-}
 
 return builder.FailedToBuild > 0 ? -1 : 0;
 
