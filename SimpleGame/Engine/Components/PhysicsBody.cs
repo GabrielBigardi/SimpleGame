@@ -10,7 +10,18 @@ public class PhysicsBody : Component
     public Transform Transform;
 
     private Vector2 _velocity;
-    public Vector2 Velocity => _velocity;
+
+    public Vector2 Velocity
+    {
+        get
+        {
+            return _velocity;
+        }
+        set
+        {
+            _velocity = value;
+        }
+    }
 
     public Vector2 ColliderSize;
     public Vector2 CollisionOffset;

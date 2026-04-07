@@ -11,6 +11,7 @@ public static class AssetManager
     
     public static Texture2D Player;
     public static Effect Shader;
+    public static SpriteFont Font;
     
     public static Texture2D LightGradientTexture;
     public static Texture2D GameWorldTexture;
@@ -42,6 +43,7 @@ public static class AssetManager
         LightGradientTexture  = Load<Texture2D>("Sprites/LightGradient");
         GameWorldTexture = Load<Texture2D>("Sprites/stardewunlighted");
         Shader = Load<Effect>("Shaders/test");
+        Font =  Load<SpriteFont>("Fonts/test");
     }
     
     public static void Unload() => _content.Unload();
