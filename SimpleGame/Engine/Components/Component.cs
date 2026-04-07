@@ -9,6 +9,6 @@ public abstract class Component
     public bool Enabled { get; set; }
     
     public virtual void Start() { }
-    public virtual void Update(float deltaTime) { }
+    public virtual void Update() { }
     public virtual void Draw(SpriteBatch spriteBatch) { }
 }

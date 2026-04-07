@@ -31,10 +31,10 @@ public class GameObject
         return _components.OfType<T>().FirstOrDefault();
     }
 
-    public void Update(float deltaTime)
+    public void Update()
     {
         foreach (var component in _components)
-            component.Update(deltaTime);
+            component.Update();
     }
 
     public void Draw(SpriteBatch spriteBatch)
