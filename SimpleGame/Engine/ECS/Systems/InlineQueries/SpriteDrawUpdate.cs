@@ -18,7 +18,6 @@ public struct SpriteDrawUpdate : IForEach<Position, SimpleGame.Engine.ECS.Compon
         if (spr.Texture == null)
             return;
 
-        pos.Current += spr.Scale;
-        //_spriteBatch.Draw(spr.Texture, pos.Current, null, Color.White, 0, new(spr.Texture.Width / 2f, spr.Texture.Height / 2f), spr.Scale, SpriteEffects.None, 0f);
+        _spriteBatch.Draw(spr.Texture, pos.Current, null, Color.White, 0, new(spr.Texture.Width / 2f, spr.Texture.Height / 2f), spr.Scale, SpriteEffects.None, 0f);
     }
 }

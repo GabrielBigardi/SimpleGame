@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
 using Arch.Core;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -8,7 +7,6 @@ using Schedulers;
 using SimpleGame.Engine;
 using SimpleGame.Engine.ECS.Components;
 using SimpleGame.Engine.ECS.Systems;
-using Sprite = SimpleGame.Engine.Sprite;
 
 namespace SimpleGame;
 
@@ -16,15 +14,17 @@ public class Game1 : Game
 {
     // ECS
     private World _world;
+    private JobScheduler _jobScheduler;
     private SpriteDrawSystem _spriteDrawSystem;
     private QueryDescription _spriteQuery =  new QueryDescription().WithAll<Position, SimpleGame.Engine.ECS.Components.Sprite>();
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
 
-    private Vector2 ScreenCenter =>
-        new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
+    private Vector2 ScreenCenter => new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
 
+    private Random _random = new();
+    
     public Game1()
     {
         _graphics = new GraphicsDeviceManager(this);
@@ -42,7 +42,7 @@ public class Game1 : Game
     {
         _world = World.Create();
         
-        var jobScheduler = new JobScheduler(
+        _jobScheduler = new JobScheduler(
             new JobScheduler.Config
             {
                 ThreadPrefixName = "Arch.Samples",
@@ -52,8 +52,7 @@ public class Game1 : Game
             }
         );
         
-        World.SharedJobScheduler = jobScheduler;
-        
+        World.SharedJobScheduler = _jobScheduler;
 
         base.Initialize();
     }
@@ -77,10 +76,10 @@ public class Game1 : Game
 
         if (Mouse.GetState().LeftButton == ButtonState.Pressed)
         {
-            for (var i = 0; i < 5000; i++)
+            for (var i = 0; i < 1000; i++)
             {
-                var randomX = new Random().Next(0, _graphics.PreferredBackBufferWidth);
-                var randomY = new Random().Next(0, _graphics.PreferredBackBufferHeight);
+                var randomX = _random.Next(0, _graphics.PreferredBackBufferWidth);
+                var randomY = _random.Next(0, _graphics.PreferredBackBufferHeight);
                 var pos  = new Vector2(randomX, randomY);
                 
                 _world.Create(new Position(pos), new SimpleGame.Engine.ECS.Components.Sprite(AssetManager.Player, Vector2.One * 0.25f));
@@ -106,20 +105,6 @@ public class Game1 : Game
         GraphicsDevice.Clear(Color.Black);
 
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-        
-        // var query = _world.Query(in _spriteQuery);
-        // foreach(ref var chunk in query.GetChunkIterator())
-        // {
-        //     var references = chunk.GetFirst<Position, SimpleGame.Engine.ECS.Components.Sprite>();  
-        //     foreach(var entity in chunk)                          
-        //     {
-        //         ref var pos = ref Unsafe.Add(ref references.t0, entity);
-        //         ref var spr = ref Unsafe.Add(ref references.t1, entity);
-        //
-        //         pos.Current += spr.Scale;
-        //         //_spriteBatch.Draw(spr.Texture, pos.Current, null, Color.White, 0, new(spr.Texture.Width / 2f, spr.Texture.Height / 2f), spr.Scale, SpriteEffects.None, 0f);
-        //     }
-        // }
 
         _spriteDrawSystem.Update();
         _spriteBatch.End();
@@ -133,5 +118,13 @@ public class Game1 : Game
         }
 
         base.Draw(gameTime);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        
+        _jobScheduler.Dispose();
+        _world.Dispose();
     }
 }
