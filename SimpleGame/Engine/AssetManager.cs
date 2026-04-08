@@ -10,7 +10,8 @@ public static class AssetManager
     private static ContentManager _content;
     
     public static Texture2D Player;
-    public static Effect Shader;
+    public static Effect OutlineShader;
+    public static Effect InstancedDrawEffect;
     public static SpriteFont Font;
     
     public static Texture2D LightGradientTexture;
@@ -42,7 +43,8 @@ public static class AssetManager
         Player = Load<Texture2D>("Sprites/test");
         LightGradientTexture  = Load<Texture2D>("Sprites/LightGradient");
         GameWorldTexture = Load<Texture2D>("Sprites/stardewunlighted");
-        Shader = Load<Effect>("Shaders/test");
+        OutlineShader = Load<Effect>("Shaders/test");
+        InstancedDrawEffect = Load<Effect>("Shaders/instancedshader");
         Font =  Load<SpriteFont>("Fonts/test");
     }
     

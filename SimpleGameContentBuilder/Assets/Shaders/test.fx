@@ -7,7 +7,7 @@
     #define PS_SHADERMODEL ps_4_0_level_9_1
 #endif
 
-float4 OutlineColor = float4(1, 0, 1, 1); 
+float4 OutlineColor = float4(0, 0, 0, 1); 
 float2 TexelSize;                         
 // CHANGED: Use a float instead of a bool to prevent the MojoShader swizzle error
 float IncludeCorners = 1.0f;              

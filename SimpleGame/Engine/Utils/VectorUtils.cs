@@ -1,9 +1,9 @@
 ﻿using System;
 using Microsoft.Xna.Framework;
 
-namespace SimpleGame.Engine;
+namespace SimpleGame.Engine.Utils;
 
-public static class Utils
+public static class VectorUtils
 {
     public static Vector2 RandomInsideUnitCircle(Random rng)
     {
