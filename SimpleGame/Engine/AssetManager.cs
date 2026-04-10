@@ -43,9 +43,8 @@ public static class AssetManager
         Player = Load<Texture2D>("Sprites/test");
         LightGradientTexture  = Load<Texture2D>("Sprites/LightGradient");
         GameWorldTexture = Load<Texture2D>("Sprites/stardewunlighted");
-        OutlineShader = Load<Effect>("Shaders/test");
-        InstancedDrawEffect = Load<Effect>("Shaders/instancedshader");
-        Font =  Load<SpriteFont>("Fonts/test");
+        OutlineShader = Load<Effect>("Shaders/Outline");
+        Font =  Load<SpriteFont>("Fonts/Alagard");
     }
     
     public static void Unload() => _content.Unload();
