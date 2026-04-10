@@ -99,7 +99,7 @@ public static class Primitives2D
             double anglePerSide = MathHelper.TwoPi / sides;
 
             // "Rotate" to the starting point
-            while ((curAngle + (anglePerSide / 2.0)) < startingAngle)
+            while ((curAngle + (anglePerSide * 0.5f)) < startingAngle)
             {
                 curAngle += anglePerSide;
 
@@ -348,7 +348,7 @@ public static class Primitives2D
             if (thickness > 1f)
             {
                 var jointSize = new Vector2(thickness);
-                var offset = jointSize / 2f;
+                var offset = jointSize * 0.5f;
 
                 // Draw a tiny filled rectangle centered on each vertex to cover the gap
                 spriteBatch.FillRectangle(p1 - offset, jointSize, color);

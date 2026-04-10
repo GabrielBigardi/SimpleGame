@@ -8,7 +8,7 @@ namespace SimpleGame.Engine.ECS.Systems.InlineQueries;
 
 public struct SpriteDrawUpdate : IForEach<Position, SimpleGame.Engine.ECS.Components.Sprite>
 {
-    private SpriteBatch _spriteBatch;
+    private readonly SpriteBatch _spriteBatch;
 
     public SpriteDrawUpdate(SpriteBatch spriteBatch) => _spriteBatch = spriteBatch;
 
@@ -18,6 +18,12 @@ public struct SpriteDrawUpdate : IForEach<Position, SimpleGame.Engine.ECS.Compon
         if (spr.Texture == null)
             return;
 
-        _spriteBatch.Draw(spr.Texture, pos.Current, null, Color.White, 0, new(spr.Texture.Width / 2f, spr.Texture.Height / 2f), spr.Scale, SpriteEffects.None, 0f);
+        if (pos.Current.X + spr.HalfSize.X < 100
+            || pos.Current.X - spr.HalfSize.X > Game1.CachedPreferredBackBufferWidth - 100
+            || pos.Current.Y + spr.HalfSize.Y < 100
+            || pos.Current.Y - spr.HalfSize.Y > Game1.CachedPreferredBackBufferHeight - 100)
+            return;
+
+        _spriteBatch.Draw(spr.Texture, pos.Current, null, spr.Color, 0, spr.Origin, spr.Scale, SpriteEffects.None, 0f);
     }
 }

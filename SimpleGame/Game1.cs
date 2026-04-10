@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using Arch.Core;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -8,6 +9,7 @@ using SimpleGame.Engine;
 using SimpleGame.Engine.ECS.Components;
 using SimpleGame.Engine.ECS.Systems;
 using SimpleGame.Engine.Utils;
+using Sprite = SimpleGame.Engine.ECS.Components.Sprite;
 
 namespace SimpleGame;
 
@@ -16,16 +18,20 @@ public class Game1 : Game
     // ECS
     private World _world;
     private JobScheduler _jobScheduler;
+    
     private SpriteDrawSystem _spriteDrawSystem;
-
-    private QueryDescription _spriteQuery =
-        new QueryDescription().WithAll<Position, SimpleGame.Engine.ECS.Components.Sprite>();
+    private QueryDescription _spriteQuery = new QueryDescription().WithAll<Position, Sprite>();
+    
+    private VelocitySystem _velocitySystem;
+    private QueryDescription _velocityQuery = new QueryDescription().WithAll<Position, Velocity>();
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
 
-    private Vector2 ScreenCenter =>
-        new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
+    public static int CachedPreferredBackBufferWidth;
+    public static int CachedPreferredBackBufferHeight;
+    
+    private Vector2 ScreenCenter => new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
 
     private Random _random = new();
 
@@ -39,6 +45,9 @@ public class Game1 : Game
 
         _graphics.PreferredBackBufferWidth = 1280;
         _graphics.PreferredBackBufferHeight = 720;
+        
+        CachedPreferredBackBufferWidth = 1280;
+        CachedPreferredBackBufferHeight = 720;
 
         _graphics.SynchronizeWithVerticalRetrace = false; // Turn off VSync
         IsFixedTimeStep = false; // Stop MonoGame from forcing 60hz game loops
@@ -50,6 +59,7 @@ public class Game1 : Game
 
     protected override void Initialize()
     {
+
         _world = World.Create();
 
         _jobScheduler = new JobScheduler(
@@ -65,6 +75,8 @@ public class Game1 : Game
         World.SharedJobScheduler = _jobScheduler;
 
         _textTarget = new RenderTarget2D(GraphicsDevice, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+
+        _velocitySystem = new VelocitySystem(_world, _velocityQuery);
 
         base.Initialize();
     }
@@ -88,14 +100,32 @@ public class Game1 : Game
 
         if (Mouse.GetState().LeftButton == ButtonState.Pressed)
         {
-            for (var i = 0; i < 1000; i++)
+            for (var i = 0; i < 200; i++)
             {
-                var randomX = _random.Next(0, _graphics.PreferredBackBufferWidth);
-                var randomY = _random.Next(0, _graphics.PreferredBackBufferHeight);
+                var randomX = _random.Next(0, CachedPreferredBackBufferWidth);
+                var randomY = _random.Next(0, CachedPreferredBackBufferHeight);
                 var pos = new Vector2(randomX, randomY);
 
-                _world.Create(new Position(pos),
-                    new SimpleGame.Engine.ECS.Components.Sprite(AssetManager.Player, Vector2.One * 0.25f));
+                var randomVelocity = VectorUtils.RandomInsideUnitCircle(_random);
+                randomVelocity.Normalize();
+
+                var scale = 0.25f;
+                var randomColor = new Color(_random.Next(0, 256), _random.Next(0, 256), _random.Next(0, 256));
+                var origin = new Vector2(AssetManager.Player.Width * 0.5f, AssetManager.Player.Height * 0.5f);
+                var halfSize = origin * scale;
+
+                _world.Create(
+                    new Position { Current = pos },
+                    new Velocity { Current = randomVelocity * 200f },
+                    new Sprite
+                    {
+                        Texture = AssetManager.Player,
+                        Scale = Vector2.One * scale,
+                        Color = randomColor,
+                        Origin = origin,
+                        HalfSize = halfSize
+                    }
+                    );
             }
         }
 
@@ -109,6 +139,8 @@ public class Game1 : Game
             AssetManager.PerformReload();
         }
 #endif
+        
+        _velocitySystem.Update();
 
         base.Update(gameTime);
     }

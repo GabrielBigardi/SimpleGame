@@ -3,4 +3,11 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace SimpleGame.Engine.ECS.Components;
 
-public record struct Sprite(Texture2D Texture, Vector2 Scale);
+public struct Sprite
+{
+    public Texture2D Texture;
+    public Vector2 Scale;
+    public Vector2 Origin;
+    public Vector2 HalfSize;
+    public Color Color;
+}

@@ -2,7 +2,7 @@
 
 namespace SimpleGame.Engine.ECS.Components;
 
-public struct Position
+public struct Velocity
 {
     public Vector2 Current;
 }
