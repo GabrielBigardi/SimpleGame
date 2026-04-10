@@ -18,10 +18,10 @@ public struct SpriteDrawUpdate : IForEach<Position, SimpleGame.Engine.ECS.Compon
         if (spr.Texture == null)
             return;
 
-        if (pos.Current.X + spr.HalfSize.X < 100
-            || pos.Current.X - spr.HalfSize.X > Game1.CachedPreferredBackBufferWidth - 100
-            || pos.Current.Y + spr.HalfSize.Y < 100
-            || pos.Current.Y - spr.HalfSize.Y > Game1.CachedPreferredBackBufferHeight - 100)
+        if (pos.Current.X + spr.HalfSize.X < 0
+            || pos.Current.X - spr.HalfSize.X > Game1.CachedPreferredBackBufferWidth
+            || pos.Current.Y + spr.HalfSize.Y < 0
+            || pos.Current.Y - spr.HalfSize.Y > Game1.CachedPreferredBackBufferHeight)
             return;
 
         _spriteBatch.Draw(spr.Texture, pos.Current, null, spr.Color, 0, spr.Origin, spr.Scale, SpriteEffects.None, 0f);

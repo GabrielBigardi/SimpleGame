@@ -18,10 +18,10 @@ public class Game1 : Game
     // ECS
     private World _world;
     private JobScheduler _jobScheduler;
-    
+
     private SpriteDrawSystem _spriteDrawSystem;
     private QueryDescription _spriteQuery = new QueryDescription().WithAll<Position, Sprite>();
-    
+
     private VelocitySystem _velocitySystem;
     private QueryDescription _velocityQuery = new QueryDescription().WithAll<Position, Velocity>();
 
@@ -30,7 +30,7 @@ public class Game1 : Game
 
     public static int CachedPreferredBackBufferWidth;
     public static int CachedPreferredBackBufferHeight;
-    
+
     private Vector2 ScreenCenter => new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
 
     private Random _random = new();
@@ -45,7 +45,7 @@ public class Game1 : Game
 
         _graphics.PreferredBackBufferWidth = 1280;
         _graphics.PreferredBackBufferHeight = 720;
-        
+
         CachedPreferredBackBufferWidth = 1280;
         CachedPreferredBackBufferHeight = 720;
 
@@ -59,7 +59,6 @@ public class Game1 : Game
 
     protected override void Initialize()
     {
-
         _world = World.Create();
 
         _jobScheduler = new JobScheduler(
@@ -125,7 +124,7 @@ public class Game1 : Game
                         Origin = origin,
                         HalfSize = halfSize
                     }
-                    );
+                );
             }
         }
 
@@ -139,7 +138,7 @@ public class Game1 : Game
             AssetManager.PerformReload();
         }
 #endif
-        
+
         _velocitySystem.Update();
 
         base.Update(gameTime);
@@ -147,34 +146,6 @@ public class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        // Draw font to a render target (needed for outline)
-        GraphicsDevice.SetRenderTarget(_textTarget);
-        GraphicsDevice.Clear(Color.Transparent);
-
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-
-        var entitiesLabelText = "Entities:";
-        var entitiesCountText = $"{_world.Size}";
-        var drawScale = 2f;
-
-        var entitiesLabelSize = AssetManager.Font.MeasureString(entitiesLabelText) * drawScale;
-        //var entitiesCountAnchorXLeft = ScreenCenter.X - entitiesLabelSize.X / 2f;
-        //var entitiesCountAnchorXRight = ScreenCenter.X + entitiesLabelSize.X / 2f;
-
-        //// Left Aligned
-        //_spriteBatch.DrawString(AssetManager.Font, entitiesLabelText, new Vector2(ScreenCenter.X, 10f), Color.White, 0f, Utils.CalculateFontOriginTopCenter(entitiesLabelText, AssetManager.Font), drawScale, SpriteEffects.None, 0f );
-        //_spriteBatch.DrawString(AssetManager.Font, entitiesCountText, new Vector2(entitiesCountAnchorXLeft, 10f + entitiesLabelSize.Y), Color.Red, 0f,Utils.CalculateFontOriginTopLeft(entitiesCountText, AssetManager.Font), drawScale, SpriteEffects.None, 0f );
-
-        //// Right Aligned
-        //_spriteBatch.DrawString(AssetManager.Font, entitiesLabelText, new Vector2(ScreenCenter.X, 10f), Color.White, 0f, Utils.CalculateFontOriginTopCenter(entitiesLabelText, AssetManager.Font), drawScale, SpriteEffects.None, 0f );
-        //_spriteBatch.DrawString(AssetManager.Font, entitiesCountText, new Vector2(entitiesCountAnchorXRight, 10f + entitiesLabelSize.Y), Color.Red, 0f,Utils.CalculateFontOriginTopRight(entitiesCountText, AssetManager.Font), drawScale, SpriteEffects.None, 0f );
-
-        // Center Aligned
-        _spriteBatch.DrawString(AssetManager.Font, entitiesLabelText, new Vector2(ScreenCenter.X, 10f), Color.White, 0f, FontUtils.CalculateFontOriginTopCenter(entitiesLabelText, AssetManager.Font), drawScale, SpriteEffects.None, 0f );
-        _spriteBatch.DrawString(AssetManager.Font, entitiesCountText, new Vector2(ScreenCenter.X, 10f + entitiesLabelSize.Y), Color.Red, 0f,FontUtils.CalculateFontOriginTopCenter(entitiesCountText, AssetManager.Font), drawScale, SpriteEffects.None, 0f );
-
-        _spriteBatch.End();
-
         // Draw the game
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(Color.Black);
@@ -183,20 +154,32 @@ public class Game1 : Game
         _spriteDrawSystem.Update();
         _spriteBatch.End();
 
-        // Draw outlined text
-        AssetManager.OutlineShader.Parameters["TexelSize"]
-            .SetValue(new Vector2(1f / _textTarget.Width, 1f / _textTarget.Height) * drawScale);
-        AssetManager.OutlineShader.Parameters["OutlineColor"].SetValue(Color.Black.ToVector4());
-        AssetManager.OutlineShader.Parameters["IncludeCorners"].SetValue(0f);
+        // Draw UI
+        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
-        _spriteBatch.Begin(effect: AssetManager.OutlineShader, samplerState: SamplerState.PointClamp,
-            blendState: BlendState.AlphaBlend);
-        _spriteBatch.Draw(_textTarget, Vector2.Zero, Color.White);
-        _spriteBatch.End();
+        _spriteBatch.DrawLine(new Vector2(ScreenCenter.X, 0f), new Vector2(ScreenCenter.X, ScreenCenter.Y * 2f),
+            new Color(255,0,0,64), 4f);
+        _spriteBatch.DrawLine(new Vector2(0f, ScreenCenter.Y), new Vector2(ScreenCenter.X * 2f, ScreenCenter.Y),
+            new Color(255,0,0,64), 4f);
+
+        var entitiesLabelText = "Entities:";
+        var entitiesCountText = $"{_world.Size}";
+        var drawScale = 2f;
+
+        var entitiesLabelSize = AssetManager.Font.MeasureString(entitiesLabelText) * drawScale;
+
+        _spriteBatch.DrawOutlinedString(
+            AssetManager.Font, entitiesLabelText, new Vector2(ScreenCenter.X, 10f),
+            Color.White, 0f,
+            FontUtils.CalculateFontOriginTopCenter(entitiesLabelText, AssetManager.Font), drawScale, SpriteEffects.None,
+            0f, OutlineFlags.Cross, Color.Black);
         
-        _spriteBatch.Begin();
-        _spriteBatch.DrawLine(new Vector2(ScreenCenter.X, 0f),  new Vector2(ScreenCenter.X, ScreenCenter.Y * 2f), Color.Red, 4f);
-        _spriteBatch.DrawLine(new Vector2(0f, ScreenCenter.Y),  new Vector2(ScreenCenter.X * 2f, ScreenCenter.Y), Color.Red, 4f);
+        _spriteBatch.DrawOutlinedString(AssetManager.Font, entitiesCountText,
+            new Vector2(ScreenCenter.X, 10f + entitiesLabelSize.Y), Color.Red, 0f,
+            FontUtils.CalculateFontOriginTopCenter(entitiesCountText, AssetManager.Font), drawScale, SpriteEffects.None,
+            0f, OutlineFlags.Cross, Color.Black);
+
+
         _spriteBatch.End();
 
         base.Draw(gameTime);
