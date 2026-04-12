@@ -1,29 +1,19 @@
 ﻿using System.Runtime.CompilerServices;
 using Arch.Core;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using SimpleGame.Engine.ECS.Components;
 
 namespace SimpleGame.Engine.ECS.Systems.InlineQueries;
 
-public struct SpriteDrawUpdate : IForEach<Position, SimpleGame.Engine.ECS.Components.Sprite>
+public struct SpriteDrawUpdate : IForEach<Position, Sprite, Visible>
 {
     private readonly SpriteBatch _spriteBatch;
 
     public SpriteDrawUpdate(SpriteBatch spriteBatch) => _spriteBatch = spriteBatch;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Update(ref Position pos, ref SimpleGame.Engine.ECS.Components.Sprite spr)
+    public void Update(ref Position pos, ref Sprite spr, ref Visible visible)
     {
-        if (spr.Texture == null)
-            return;
-
-        if (pos.Current.X + spr.HalfSize.X < 0
-            || pos.Current.X - spr.HalfSize.X > Game1.CachedPreferredBackBufferWidth
-            || pos.Current.Y + spr.HalfSize.Y < 0
-            || pos.Current.Y - spr.HalfSize.Y > Game1.CachedPreferredBackBufferHeight)
-            return;
-
         _spriteBatch.Draw(spr.Texture, pos.Current, null, spr.Color, 0, spr.Origin, spr.Scale, SpriteEffects.None, 0f);
     }
 }

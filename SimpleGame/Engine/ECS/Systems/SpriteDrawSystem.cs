@@ -20,6 +20,6 @@ public class SpriteDrawSystem
 
     public void Update()
     {
-        _world.InlineQuery<SpriteDrawUpdate, Position, SimpleGame.Engine.ECS.Components.Sprite>(in _query, ref _spriteUpdate);
+        _world.InlineQuery<SpriteDrawUpdate, Position, Sprite, Visible>(in _query, ref _spriteUpdate);
     }
 }

@@ -20,6 +20,7 @@ public class VelocitySystem
 
     public void Update()
     {
+        _velocityUpdate.DeltaTime = TimeManager.DeltaTime;
         _world.InlineParallelQuery<VelocityUpdate, Position, Velocity>(in _query, ref _velocityUpdate);
     }
 }

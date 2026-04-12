@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Runtime.InteropServices;
+using Arch.Buffer;
 using Arch.Core;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -9,7 +9,6 @@ using SimpleGame.Engine;
 using SimpleGame.Engine.ECS.Components;
 using SimpleGame.Engine.ECS.Systems;
 using SimpleGame.Engine.Utils;
-using Sprite = SimpleGame.Engine.ECS.Components.Sprite;
 
 namespace SimpleGame;
 
@@ -18,9 +17,18 @@ public class Game1 : Game
     // ECS
     private World _world;
     private JobScheduler _jobScheduler;
+    
+    public static CommandBuffer VisibilityBuffer = new();
+    public static CommandBuffer HiddenBuffer = new();
+    
+    private VisibleCheckSystem _visibleSystem;
+    private QueryDescription _visibleCheckQuery = new QueryDescription().WithAll<Position, Sprite, Visible>();
+    
+    private HiddenCheckSystem _hiddenSystem;
+    private QueryDescription _hiddenQuery = new QueryDescription().WithAll<Position, Sprite>().WithNone<Visible>();
 
     private SpriteDrawSystem _spriteDrawSystem;
-    private QueryDescription _spriteQuery = new QueryDescription().WithAll<Position, Sprite>();
+    private QueryDescription _spriteQuery = new QueryDescription().WithAll<Position, Sprite, Visible>();
 
     private VelocitySystem _velocitySystem;
     private QueryDescription _velocityQuery = new QueryDescription().WithAll<Position, Velocity>();
@@ -30,12 +38,11 @@ public class Game1 : Game
 
     public static int CachedPreferredBackBufferWidth;
     public static int CachedPreferredBackBufferHeight;
+    
 
     private Vector2 ScreenCenter => new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
 
     private Random _random = new();
-
-    private RenderTarget2D _textTarget;
 
     public Game1()
     {
@@ -49,11 +56,14 @@ public class Game1 : Game
         CachedPreferredBackBufferWidth = 1280;
         CachedPreferredBackBufferHeight = 720;
 
-        _graphics.SynchronizeWithVerticalRetrace = false; // Turn off VSync
-        IsFixedTimeStep = false; // Stop MonoGame from forcing 60hz game loops
+        // Unlimited FPS
+        _graphics.SynchronizeWithVerticalRetrace = false;
+        IsFixedTimeStep = false;
 
+        // Limited FPS
         // IsFixedTimeStep = true;
         // TargetElapsedTime = TimeSpan.FromSeconds(1d / 60d);
+
         _graphics.ApplyChanges();
     }
 
@@ -64,17 +74,18 @@ public class Game1 : Game
         _jobScheduler = new JobScheduler(
             new JobScheduler.Config
             {
-                ThreadPrefixName = "Arch.Samples",
-                ThreadCount = 0,
-                MaxExpectedConcurrentJobs = 64,
-                StrictAllocationMode = false,
+                ThreadPrefixName = "SimpleGame",
             }
         );
+        
+        Console.WriteLine(_jobScheduler.ThreadCount);
 
         World.SharedJobScheduler = _jobScheduler;
 
-        _textTarget = new RenderTarget2D(GraphicsDevice, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
-
+        // Culling System (2 systems)
+        _visibleSystem = new VisibleCheckSystem(_world, _visibleCheckQuery);
+        _hiddenSystem = new HiddenCheckSystem(_world, _hiddenQuery);
+        
         _velocitySystem = new VelocitySystem(_world, _velocityQuery);
 
         base.Initialize();
@@ -97,6 +108,9 @@ public class Game1 : Game
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
+        _visibleSystem.Update();
+        _hiddenSystem.Update();
+
         if (Mouse.GetState().LeftButton == ButtonState.Pressed)
         {
             for (var i = 0; i < 200; i++)
@@ -110,7 +124,7 @@ public class Game1 : Game
 
                 var scale = 0.25f;
                 var randomColor = new Color(_random.Next(0, 256), _random.Next(0, 256), _random.Next(0, 256));
-                var origin = new Vector2(AssetManager.Player.Width * 0.5f, AssetManager.Player.Height * 0.5f);
+                var origin = new Vector2(AssetManager.PlayerTexture.Width * 0.5f, AssetManager.PlayerTexture.Height * 0.5f);
                 var halfSize = origin * scale;
 
                 _world.Create(
@@ -118,12 +132,13 @@ public class Game1 : Game
                     new Velocity { Current = randomVelocity * 200f },
                     new Sprite
                     {
-                        Texture = AssetManager.Player,
+                        Texture = AssetManager.PlayerTexture,
                         Scale = Vector2.One * scale,
                         Color = randomColor,
                         Origin = origin,
                         HalfSize = halfSize
-                    }
+                    },
+                    new Visible()
                 );
             }
         }
@@ -140,6 +155,9 @@ public class Game1 : Game
 #endif
 
         _velocitySystem.Update();
+        
+        VisibilityBuffer.Playback(_world);
+        HiddenBuffer.Playback(_world);
 
         base.Update(gameTime);
     }
