@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using Arch.Buffer;
 using Arch.Core;
+using Arch.Core.Extensions;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -89,6 +91,15 @@ public class Game1 : Game
         _velocitySystem = new VelocitySystem(_world, _velocityQuery);
 
         base.Initialize();
+
+        // If this is a AOT build add components to arrayregistry
+        if (!RuntimeFeature.IsDynamicCodeSupported)
+        {
+            ArrayRegistry.Add<Position>();
+            ArrayRegistry.Add<Sprite>();
+            ArrayRegistry.Add<Velocity>();
+            ArrayRegistry.Add<Visible>();
+        }
     }
 
     protected override void LoadContent()
@@ -107,6 +118,7 @@ public class Game1 : Game
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
+        
 
         _visibleSystem.Update();
         _hiddenSystem.Update();
@@ -151,6 +163,12 @@ public class Game1 : Game
         if (AssetManager.NeedsReload)
         {
             AssetManager.PerformReload();
+            
+            var query = new QueryDescription().WithAll<Sprite>();
+            _world.Query(in query, (ref Sprite spr) =>
+            {
+                spr.Texture = AssetManager.PlayerTexture;
+            }); 
         }
 #endif
 

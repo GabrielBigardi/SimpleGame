@@ -7,27 +7,54 @@
 /// For more details regarding the Content Builder, see the MonoGame documentation: <tbc.>
 /// </remarks>
 
+using System.Runtime.CompilerServices;
 using Microsoft.Xna.Framework.Content.Pipeline;
 using MonoGame.Framework.Content.Pipeline.Builder;
 
-var contentCollectionArgs = new ContentBuilderParams()
-{
-    Mode = ContentBuilderMode.Builder,
-    WorkingDirectory = $"{AppContext.BaseDirectory}../../../", // path to where your content folder can be located
-    SourceDirectory = "Assets", // Not actually needed as this is the default, but added for reference
 #if DEBUG
-    OutputDirectory = $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Debug/net9.0/",
+    var debugContentBuilderParams = new ContentBuilderParams()
+    {
+        Mode = ContentBuilderMode.Builder,
+        WorkingDirectory = $"{AppContext.BaseDirectory}../../../", // path to where your content folder can be located
+        SourceDirectory = "Assets", // Not actually needed as this is the default, but added for reference
+        OutputDirectory = $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Debug/net9.0/win-x64/",
+        Platform = TargetPlatform.DesktopGL
+    };
 #else
-    OutputDirectory = $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Release/net9.0/",
+    var defaultReleaseContentBuilderParams = new ContentBuilderParams()
+    {
+        Mode = ContentBuilderMode.Builder,
+        WorkingDirectory = $"{AppContext.BaseDirectory}../../../", // path to where your content folder can be located
+        SourceDirectory = "Assets", // Not actually needed as this is the default, but added for reference
+        OutputDirectory = $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Release/net9.0/win-x64/",
+        Platform = TargetPlatform.DesktopGL
+    };
+
+    var aotReleaseContentBuilderParams = new ContentBuilderParams()
+    {
+        Mode = ContentBuilderMode.Builder,
+        WorkingDirectory = $"{AppContext.BaseDirectory}../../../", // path to where your content folder can be located
+        SourceDirectory = "Assets", // Not actually needed as this is the default, but added for reference
+        OutputDirectory = $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Release/net9.0/win-x64/publish/",
+        Platform = TargetPlatform.DesktopGL
+    };
 #endif
-    Platform = TargetPlatform.DesktopGL
-};
+
 var builder = new Builder();
 
 if (args is not null && args.Length > 0)
+{
     builder.Run(args);
+}
 else
-    builder.Run(contentCollectionArgs);
+{
+#if DEBUG
+    builder.Run(debugContentBuilderParams);
+#else
+    builder.Run(defaultReleaseContentBuilderParams);
+    builder.Run(aotReleaseContentBuilderParams);
+#endif
+}
 
 return builder.FailedToBuild > 0 ? -1 : 0;
 

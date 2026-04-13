@@ -18,6 +18,9 @@ public static class AssetManager
     public static Texture2D GameWorldTexture;
     
     public static bool NeedsReload { get; private set; }
+    
+    // Store the FileSystemWatcher as static field to prevent it from getting garbage collected
+    private static FileSystemWatcher _watcher;
 
     private static T Load<T>(string path) where T : class
     {
@@ -55,10 +58,10 @@ public static class AssetManager
     public static void InitializeHotReload()
     {
         // The assets directory to be watched, this is working fine
-        var projectDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../"));
+        var projectDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
         var assetsDir = Path.Combine(projectDir, "../SimpleGameContentBuilder/Assets");
 
-        var watcher = new FileSystemWatcher
+        _watcher = new FileSystemWatcher
         {
             Path = assetsDir,
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
@@ -67,9 +70,13 @@ public static class AssetManager
             EnableRaisingEvents = true
         };
 
-        watcher.Changed += OnAssetChanged;
-        watcher.Created += OnAssetChanged;
-        watcher.Renamed += OnAssetChanged;
+        _watcher.Changed += OnAssetChanged;
+        _watcher.Created += OnAssetChanged;
+        _watcher.Renamed += OnAssetChanged;
+        _watcher.Error += (s, e) =>
+        {
+            Console.WriteLine($"[Hot-Reload] Watcher error: {e.GetException()}");
+        };
     }
     
 private static void OnAssetChanged(object sender, FileSystemEventArgs args)
@@ -85,10 +92,10 @@ private static void OnAssetChanged(object sender, FileSystemEventArgs args)
         Task.Run(() =>
         {
             // For some reason if i try removing path.combine which points to the same directory it gets mad
-            var outDir = Path.Combine(AppContext.BaseDirectory, "../net9.0");
+            var outDir = Path.Combine(AppContext.BaseDirectory, "../../net9.0/win-x64/");
 
             // Project base dir and temp dir
-            var projectDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../"));
+            var projectDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
             var tempDir = Path.Combine(projectDir, "obj", "Content");
 
             // Builder project
