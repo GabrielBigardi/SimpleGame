@@ -1,4 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
+using Arch.Buffer;
 using Arch.Core;
 using SimpleGame.Engine.ECS.Components;
 
@@ -6,6 +7,7 @@ namespace SimpleGame.Engine.ECS.Systems.InlineQueries;
 
 public struct HiddenCheckUpdate : IForEachWithEntity<Position, Sprite>
 {
+    public CommandBuffer VisibilityBuffer;
     public int PreferredBackBufferWidth;
     public int PreferredBackBufferHeight;
     
@@ -17,7 +19,7 @@ public struct HiddenCheckUpdate : IForEachWithEntity<Position, Sprite>
             && pos.Current.Y + spr.HalfSize.Y >= 100
             && pos.Current.Y - spr.HalfSize.Y <= PreferredBackBufferHeight - 100)
         {
-            Game1.HiddenBuffer.Add<Visible>(entity);
+            VisibilityBuffer.Add<Visible>(entity);
         }
     }
 }

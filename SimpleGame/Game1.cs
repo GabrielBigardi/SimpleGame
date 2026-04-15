@@ -19,9 +19,8 @@ public class Game1 : Game
     // ECS
     private World _world;
     private JobScheduler _jobScheduler;
-    
-    public static CommandBuffer VisibilityBuffer = new();
-    public static CommandBuffer HiddenBuffer = new();
+
+    private readonly CommandBuffer _visibilityBuffer = new();
     
     private VisibleCheckSystem _visibleSystem;
     private HiddenCheckSystem _hiddenSystem;
@@ -78,8 +77,8 @@ public class Game1 : Game
         World.SharedJobScheduler = _jobScheduler;
 
         // Culling System (2 systems)
-        _visibleSystem = new VisibleCheckSystem(_world);
-        _hiddenSystem = new HiddenCheckSystem(_world);
+        _visibleSystem = new VisibleCheckSystem(_world, _visibilityBuffer);
+        _hiddenSystem = new HiddenCheckSystem(_world, _visibilityBuffer);
         _velocitySystem = new VelocitySystem(_world);
 
         base.Initialize();
@@ -110,17 +109,13 @@ public class Game1 : Game
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
-        
-
-        _visibleSystem.Update();
-        _hiddenSystem.Update();
 
         if (Mouse.GetState().LeftButton == ButtonState.Pressed)
         {
-            for (var i = 0; i < 200; i++)
+            for (var i = 0; i < 100; i++)
             {
-                var randomX = _random.Next(0, CachedPreferredBackBufferWidth);
-                var randomY = _random.Next(0, CachedPreferredBackBufferHeight);
+                var randomX = _random.Next(100, CachedPreferredBackBufferWidth - 100);
+                var randomY = _random.Next(100, CachedPreferredBackBufferHeight - 100);
                 var pos = new Vector2(randomX, randomY);
 
                 var randomVelocity = VectorUtils.RandomInsideUnitCircle(_random);
@@ -165,9 +160,10 @@ public class Game1 : Game
 #endif
 
         _velocitySystem.Update();
+        _visibleSystem.Update();
+        _hiddenSystem.Update();
         
-        VisibilityBuffer.Playback(_world);
-        HiddenBuffer.Playback(_world);
+        _visibilityBuffer.Playback(_world);
 
         base.Update(gameTime);
     }

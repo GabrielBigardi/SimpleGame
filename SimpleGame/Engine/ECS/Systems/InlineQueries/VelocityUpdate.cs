@@ -11,6 +11,7 @@ public struct VelocityUpdate : IForEach<Position, Velocity>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Update(ref Position pos, ref Velocity vel)
     {
-        pos.Current += vel.Current * DeltaTime;
+        pos.Current.X += vel.Current.X * DeltaTime;
+        pos.Current.Y += vel.Current.Y * DeltaTime;
     }
 }
