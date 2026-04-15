@@ -2,12 +2,12 @@
 using System.Runtime.CompilerServices;
 using Arch.Buffer;
 using Arch.Core;
-using Arch.Core.Extensions;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Schedulers;
 using SimpleGame.Engine;
+using SimpleGame.Engine.Atlas;
 using SimpleGame.Engine.ECS.Components;
 using SimpleGame.Engine.ECS.Systems;
 using SimpleGame.Engine.Utils;
@@ -16,7 +16,7 @@ namespace SimpleGame;
 
 public class Game1 : Game
 {
-    // ECS
+    // === ECS ===
     private World _world;
     private JobScheduler _jobScheduler;
     
@@ -34,12 +34,19 @@ public class Game1 : Game
 
     private VelocitySystem _velocitySystem;
     private QueryDescription _velocityQuery = new QueryDescription().WithAll<Position, Velocity>();
+    // ======
 
+    // === MonoGame ===
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
 
     public static int CachedPreferredBackBufferWidth;
     public static int CachedPreferredBackBufferHeight;
+    // ======
+    
+    // === Game ===
+    private AtlasData _atlasData;
+    // ======
     
 
     private Vector2 ScreenCenter => new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
@@ -90,8 +97,6 @@ public class Game1 : Game
         
         _velocitySystem = new VelocitySystem(_world, _velocityQuery);
 
-        base.Initialize();
-
         // If this is a AOT build add components to arrayregistry
         if (!RuntimeFeature.IsDynamicCodeSupported)
         {
@@ -100,6 +105,10 @@ public class Game1 : Game
             ArrayRegistry.Add<Velocity>();
             ArrayRegistry.Add<Visible>();
         }
+
+        _atlasData = AtlasUtils.LoadAtlas("Content/Generated/atlas.json");
+        
+        base.Initialize();
     }
 
     protected override void LoadContent()
@@ -125,10 +134,10 @@ public class Game1 : Game
 
         if (Mouse.GetState().LeftButton == ButtonState.Pressed)
         {
-            for (var i = 0; i < 200; i++)
+            for (var i = 0; i < 100; i++)
             {
-                var randomX = _random.Next(0, CachedPreferredBackBufferWidth);
-                var randomY = _random.Next(0, CachedPreferredBackBufferHeight);
+                var randomX = _random.Next(100, CachedPreferredBackBufferWidth - 100);
+                var randomY = _random.Next(100, CachedPreferredBackBufferHeight - 100);
                 var pos = new Vector2(randomX, randomY);
 
                 var randomVelocity = VectorUtils.RandomInsideUnitCircle(_random);
@@ -136,7 +145,7 @@ public class Game1 : Game
 
                 var scale = 0.25f;
                 var randomColor = new Color(_random.Next(0, 256), _random.Next(0, 256), _random.Next(0, 256));
-                var origin = new Vector2(AssetManager.PlayerTexture.Width * 0.5f, AssetManager.PlayerTexture.Height * 0.5f);
+                var origin = new Vector2(_atlasData["test"].Width * 0.5f, _atlasData["test"].Height * 0.5f);
                 var halfSize = origin * scale;
 
                 _world.Create(
@@ -144,10 +153,11 @@ public class Game1 : Game
                     new Velocity { Current = randomVelocity * 200f },
                     new Sprite
                     {
-                        Texture = AssetManager.PlayerTexture,
+                        Texture = AssetManager.AtlasTexture,
                         Scale = Vector2.One * scale,
                         Color = randomColor,
                         Origin = origin,
+                        Source = new Rectangle(_atlasData["test"].X, _atlasData["test"].Y, _atlasData["test"].Width, _atlasData["test"].Height),
                         HalfSize = halfSize
                     },
                     new Visible()
@@ -167,7 +177,7 @@ public class Game1 : Game
             var query = new QueryDescription().WithAll<Sprite>();
             _world.Query(in query, (ref Sprite spr) =>
             {
-                spr.Texture = AssetManager.PlayerTexture;
+                spr.Texture = AssetManager.AtlasTexture;
             }); 
         }
 #endif

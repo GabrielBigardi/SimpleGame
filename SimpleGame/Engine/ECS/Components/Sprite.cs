@@ -9,5 +9,6 @@ public struct Sprite
     public Vector2 Scale;
     public Vector2 Origin;
     public Vector2 HalfSize;
+    public Rectangle Source;
     public Color Color;
 }

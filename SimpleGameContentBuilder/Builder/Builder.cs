@@ -7,9 +7,9 @@
 /// For more details regarding the Content Builder, see the MonoGame documentation: <tbc.>
 /// </remarks>
 
-using System.Runtime.CompilerServices;
 using Microsoft.Xna.Framework.Content.Pipeline;
 using MonoGame.Framework.Content.Pipeline.Builder;
+using SimpleGameContentBuilder.Builder;
 
 #if DEBUG
     var debugContentBuilderParams = new ContentBuilderParams()
@@ -60,16 +60,36 @@ return builder.FailedToBuild > 0 ? -1 : 0;
 
 public class Builder : ContentBuilder
 {
+    private string _workingDirectory = $"{AppContext.BaseDirectory}../../../";
+    
     public override IContentCollection GetContentCollection()
     {
+        RunTexturePacker();
+
         var contentCollection = new ContentCollection();
 
-        // include everything in the folder
         contentCollection.Include<WildcardRule>("*");
-
-        // By default, all content will be imported from the Assets folder using the default importer for their file type.
-        // Please add any custom content collection rules here.
+        contentCollection.Exclude<WildcardRule>("Sprites/*");
 
         return contentCollection;
+    }
+    
+    private void RunTexturePacker()
+    {
+        var assetsDir = Path.Combine(_workingDirectory, "Assets", "Sprites");
+        var atlasOutputDir = Path.Combine(_workingDirectory, "Assets", "Generated");
+        
+#if DEBUG
+        var jsonOutputDir = $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Debug/net9.0/win-x64/Content/Generated/";
+#else
+        var jsonOutputDir =
+            $"{AppContext.BaseDirectory}../../../../SimpleGame/bin/Release/net9.0/win-x64/Content/Generated/";
+#endif
+
+        // Create directories if needed
+        Directory.CreateDirectory(atlasOutputDir);
+        Directory.CreateDirectory(jsonOutputDir);
+
+        TexturePacker.Run(assetsDir, atlasOutputDir, jsonOutputDir);
     }
 }
