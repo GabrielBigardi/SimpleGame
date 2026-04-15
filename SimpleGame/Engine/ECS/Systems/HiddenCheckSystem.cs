@@ -10,10 +10,10 @@ public class HiddenCheckSystem
     private QueryDescription _query;
     private HiddenCheckUpdate _hiddenCheckUpdate;
     
-    public HiddenCheckSystem(World world, QueryDescription queryDescription)
+    public HiddenCheckSystem(World world)
     {
         _world = world;
-        _query = queryDescription;
+        _query = new QueryDescription().WithAll<Position, Sprite>().WithNone<Visible>();;
         _hiddenCheckUpdate = new HiddenCheckUpdate();
     }
 

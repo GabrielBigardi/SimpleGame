@@ -11,10 +11,10 @@ public class SpriteDrawSystem
     private QueryDescription _query;
     private SpriteDrawUpdate _spriteUpdate;
     
-    public SpriteDrawSystem(World world, QueryDescription queryDescription, SpriteBatch spriteBatch)
+    public SpriteDrawSystem(World world, SpriteBatch spriteBatch)
     {
         _world = world;
-        _query = queryDescription;
+        _query = new QueryDescription().WithAll<Position, Sprite, Visible>();
         _spriteUpdate = new SpriteDrawUpdate(spriteBatch);
     }
 

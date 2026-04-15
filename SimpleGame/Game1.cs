@@ -24,16 +24,9 @@ public class Game1 : Game
     public static CommandBuffer HiddenBuffer = new();
     
     private VisibleCheckSystem _visibleSystem;
-    private QueryDescription _visibleCheckQuery = new QueryDescription().WithAll<Position, Sprite, Visible>();
-    
     private HiddenCheckSystem _hiddenSystem;
-    private QueryDescription _hiddenQuery = new QueryDescription().WithAll<Position, Sprite>().WithNone<Visible>();
-
     private SpriteDrawSystem _spriteDrawSystem;
-    private QueryDescription _spriteQuery = new QueryDescription().WithAll<Position, Sprite, Visible>();
-
     private VelocitySystem _velocitySystem;
-    private QueryDescription _velocityQuery = new QueryDescription().WithAll<Position, Velocity>();
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
@@ -85,10 +78,9 @@ public class Game1 : Game
         World.SharedJobScheduler = _jobScheduler;
 
         // Culling System (2 systems)
-        _visibleSystem = new VisibleCheckSystem(_world, _visibleCheckQuery);
-        _hiddenSystem = new HiddenCheckSystem(_world, _hiddenQuery);
-        
-        _velocitySystem = new VelocitySystem(_world, _velocityQuery);
+        _visibleSystem = new VisibleCheckSystem(_world);
+        _hiddenSystem = new HiddenCheckSystem(_world);
+        _velocitySystem = new VelocitySystem(_world);
 
         base.Initialize();
 
@@ -105,7 +97,7 @@ public class Game1 : Game
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _spriteDrawSystem = new SpriteDrawSystem(_world, _spriteQuery, _spriteBatch);
+        _spriteDrawSystem = new SpriteDrawSystem(_world, _spriteBatch);
 
         AssetManager.Load(Content);
 #if DEBUG

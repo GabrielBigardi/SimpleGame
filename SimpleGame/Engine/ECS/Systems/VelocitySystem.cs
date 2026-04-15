@@ -11,10 +11,10 @@ public class VelocitySystem
     private QueryDescription _query;
     private VelocityUpdate _velocityUpdate;
     
-    public VelocitySystem(World world, QueryDescription queryDescription)
+    public VelocitySystem(World world)
     {
         _world = world;
-        _query = queryDescription;
+        _query = new QueryDescription().WithAll<Position, Velocity>();
         _velocityUpdate = new VelocityUpdate();
     }
 

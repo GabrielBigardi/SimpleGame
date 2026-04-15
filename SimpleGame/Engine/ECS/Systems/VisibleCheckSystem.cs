@@ -10,10 +10,10 @@ public class VisibleCheckSystem
     private QueryDescription _query;
     private VisibleCheckUpdate _visibleCheckUpdate;
     
-    public VisibleCheckSystem(World world, QueryDescription queryDescription)
+    public VisibleCheckSystem(World world)
     {
         _world = world;
-        _query = queryDescription;
+        _query = new QueryDescription().WithAll<Position, Sprite, Visible>();
         _visibleCheckUpdate = new VisibleCheckUpdate();
     }
 
