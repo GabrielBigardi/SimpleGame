@@ -1,6 +1,6 @@
-﻿namespace SimpleGame.Engine.ECS.Components;
+﻿using Arch.AOT.SourceGenerator;
 
-public struct Visible
-{
+namespace SimpleGame.Engine.ECS.Components;
 
-}
+//[Component]
+public struct Visible;

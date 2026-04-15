@@ -1,25 +1,19 @@
-﻿using Arch.Core;
+﻿using System.Runtime.CompilerServices;
+using Arch.Core;
+using Arch.System;
+using Arch.System.SourceGenerator;
 using Microsoft.Xna.Framework.Graphics;
 using SimpleGame.Engine.ECS.Components;
-using SimpleGame.Engine.ECS.Systems.InlineQueries;
 
 namespace SimpleGame.Engine.ECS.Systems;
 
-public class SpriteDrawSystem
+public partial class SpriteDrawSystem(World world) : BaseSystem<World, SpriteBatch>(world)
 {
-    private World _world;
-    private QueryDescription _query;
-    private SpriteDrawUpdate _spriteUpdate;
-    
-    public SpriteDrawSystem(World world, QueryDescription queryDescription, SpriteBatch spriteBatch)
+    [Query]
+    [All<Position,Sprite,Visible>]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Draw([Data] in SpriteBatch spriteBatch, ref Sprite spr, ref Position pos)
     {
-        _world = world;
-        _query = queryDescription;
-        _spriteUpdate = new SpriteDrawUpdate(spriteBatch);
-    }
-
-    public void Update()
-    {
-        _world.InlineQuery<SpriteDrawUpdate, Position, Sprite, Visible>(in _query, ref _spriteUpdate);
+        spriteBatch.Draw(spr.Texture, pos.Current, null, spr.Color, 0, spr.Origin, spr.Scale, SpriteEffects.None, 0f);
     }
 }

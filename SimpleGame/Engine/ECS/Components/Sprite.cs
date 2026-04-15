@@ -1,8 +1,10 @@
-﻿using Microsoft.Xna.Framework;
+﻿using Arch.AOT.SourceGenerator;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
 namespace SimpleGame.Engine.ECS.Components;
 
+//[Component]
 public struct Sprite
 {
     public Texture2D Texture;

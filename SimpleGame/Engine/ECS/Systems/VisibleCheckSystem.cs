@@ -1,26 +1,24 @@
-﻿using Arch.Core;
+﻿using System.Runtime.CompilerServices;
+using Arch.Core;
+using Arch.System;
+using Arch.System.SourceGenerator;
 using SimpleGame.Engine.ECS.Components;
-using SimpleGame.Engine.ECS.Systems.InlineQueries;
 
 namespace SimpleGame.Engine.ECS.Systems;
 
-public class VisibleCheckSystem
+public partial class VisibleCheckSystem(World world) : BaseSystem<World, int>(world)
 {
-    private World _world;
-    private QueryDescription _query;
-    private VisibleCheckUpdate _visibleCheckUpdate;
-    
-    public VisibleCheckSystem(World world, QueryDescription queryDescription)
+    [Query(Parallel = true)]
+    [All<Position,Sprite,Visible>]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Check(in Entity entity, ref Position pos, ref Sprite spr)
     {
-        _world = world;
-        _query = queryDescription;
-        _visibleCheckUpdate = new VisibleCheckUpdate();
-    }
-
-    public void Update()
-    {
-        _visibleCheckUpdate.PreferredBackBufferWidth = Game1.CachedPreferredBackBufferWidth;
-        _visibleCheckUpdate.PreferredBackBufferHeight = Game1.CachedPreferredBackBufferHeight;
-        _world.InlineParallelEntityQuery<VisibleCheckUpdate, Position, Sprite, Visible>(in _query, ref _visibleCheckUpdate);
+        if (pos.Current.X + spr.HalfSize.X < 100
+            || pos.Current.X - spr.HalfSize.X > Game1.CachedPreferredBackBufferWidth - 100
+            || pos.Current.Y + spr.HalfSize.Y < 100
+            || pos.Current.Y - spr.HalfSize.Y > Game1.CachedPreferredBackBufferHeight - 100)
+        {
+            Game1.VisibilityBuffer.Remove<Visible>(entity);
+        }
     }
 }

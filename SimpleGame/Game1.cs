@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using Arch.Buffer;
 using Arch.Core;
-using Arch.Core.Extensions;
+using Arch.System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -16,30 +16,30 @@ namespace SimpleGame;
 
 public class Game1 : Game
 {
-    // ECS
+    // === ECS ===
     private World _world;
     private JobScheduler _jobScheduler;
-    
+
     public static CommandBuffer VisibilityBuffer = new();
-    public static CommandBuffer HiddenBuffer = new();
-    
-    private VisibleCheckSystem _visibleSystem;
-    private QueryDescription _visibleCheckQuery = new QueryDescription().WithAll<Position, Sprite, Visible>();
-    
-    private HiddenCheckSystem _hiddenSystem;
-    private QueryDescription _hiddenQuery = new QueryDescription().WithAll<Position, Sprite>().WithNone<Visible>();
+    // ======
 
-    private SpriteDrawSystem _spriteDrawSystem;
-    private QueryDescription _spriteQuery = new QueryDescription().WithAll<Position, Sprite, Visible>();
-
-    private VelocitySystem _velocitySystem;
-    private QueryDescription _velocityQuery = new QueryDescription().WithAll<Position, Velocity>();
-
+    // === MonoGame ===
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
 
     public static int CachedPreferredBackBufferWidth;
     public static int CachedPreferredBackBufferHeight;
+    // ======
+    
+    // === Game ===
+    private bool _spawned = false;
+    private Matrix _projectionMatrix;
+
+    private Group<float> _deltatimeSystems;
+    private Group<SpriteBatch> _drawSystems;
+
+    private Group<int> _visibilitySystems;
+    // ======
     
 
     private Vector2 ScreenCenter => new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
@@ -72,6 +72,17 @@ public class Game1 : Game
     protected override void Initialize()
     {
         _world = World.Create();
+        
+        _deltatimeSystems = new Group<float>("Movement Related", new VelocitySystem(_world));
+        _deltatimeSystems.Initialize();
+
+        _drawSystems = new Group<SpriteBatch>("Drawing Systems", new SpriteDrawSystem(_world));
+        _drawSystems.Initialize();
+
+        _visibilitySystems = new Group<int>("Visibility Systems",
+            new HiddenCheckSystem(_world),
+            new VisibleCheckSystem(_world));
+        _visibilitySystems.Initialize();
 
         _jobScheduler = new JobScheduler(
             new JobScheduler.Config
@@ -84,14 +95,6 @@ public class Game1 : Game
 
         World.SharedJobScheduler = _jobScheduler;
 
-        // Culling System (2 systems)
-        _visibleSystem = new VisibleCheckSystem(_world, _visibleCheckQuery);
-        _hiddenSystem = new HiddenCheckSystem(_world, _hiddenQuery);
-        
-        _velocitySystem = new VelocitySystem(_world, _velocityQuery);
-
-        base.Initialize();
-
         // If this is a AOT build add components to arrayregistry
         if (!RuntimeFeature.IsDynamicCodeSupported)
         {
@@ -100,17 +103,20 @@ public class Game1 : Game
             ArrayRegistry.Add<Velocity>();
             ArrayRegistry.Add<Visible>();
         }
+
+        base.Initialize();
     }
 
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _spriteDrawSystem = new SpriteDrawSystem(_world, _spriteQuery, _spriteBatch);
 
         AssetManager.Load(Content);
 #if DEBUG
         AssetManager.InitializeHotReload();
 #endif
+
+        _projectionMatrix = Matrix.CreateOrthographicOffCenter(0, _graphics.PreferredBackBufferWidth, _graphics.PreferredBackBufferHeight, 0, 0, 1);
     }
 
     protected override void Update(GameTime gameTime)
@@ -118,17 +124,15 @@ public class Game1 : Game
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
-        
 
-        _visibleSystem.Update();
-        _hiddenSystem.Update();
+        _visibilitySystems.Update(in CachedPreferredBackBufferWidth);
 
         if (Mouse.GetState().LeftButton == ButtonState.Pressed)
         {
-            for (var i = 0; i < 200; i++)
+            for (var i = 0; i < 100; i++)
             {
-                var randomX = _random.Next(0, CachedPreferredBackBufferWidth);
-                var randomY = _random.Next(0, CachedPreferredBackBufferHeight);
+                var randomX = _random.Next(100, CachedPreferredBackBufferWidth - 100);
+                var randomY = _random.Next(100, CachedPreferredBackBufferHeight - 100);
                 var pos = new Vector2(randomX, randomY);
 
                 var randomVelocity = VectorUtils.RandomInsideUnitCircle(_random);
@@ -172,12 +176,11 @@ public class Game1 : Game
         }
 #endif
 
-        _velocitySystem.Update();
-        
-        VisibilityBuffer.Playback(_world);
-        HiddenBuffer.Playback(_world);
+        _deltatimeSystems.Update(in TimeManager.DeltaTime);
 
         base.Update(gameTime);
+        
+        VisibilityBuffer.Playback(_world);
     }
 
     protected override void Draw(GameTime gameTime)
@@ -187,7 +190,7 @@ public class Game1 : Game
         GraphicsDevice.Clear(Color.Black);
 
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-        _spriteDrawSystem.Update();
+        _drawSystems.Update(in _spriteBatch);
         _spriteBatch.End();
 
         // Draw UI
@@ -227,5 +230,6 @@ public class Game1 : Game
 
         _jobScheduler.Dispose();
         _world.Dispose();
+        _deltatimeSystems.Dispose();
     }
 }
