@@ -33,4 +33,7 @@
         <PackageReference Include="Arch" Version="2.1.0-beta" />
         <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5-preview.3" />
     </ItemGroup>
+    <ItemGroup>
+      <Folder Include="Engine\Managers\" />
+    </ItemGroup>
 </Project>

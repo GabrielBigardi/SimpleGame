@@ -2,8 +2,10 @@
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Media;
 
 public static class AssetManager
 {
@@ -12,7 +14,9 @@ public static class AssetManager
     public static Texture2D PlayerTexture;
     public static Texture2D RoguelikeAtlas;
     public static SpriteFont Font;
-
+    public static SoundEffect BubblePopSound;
+    public static SoundEffect ExplosionSound;
+    public static Song GameplaySong;
     
     public static bool NeedsReload { get; private set; }
     
@@ -43,6 +47,9 @@ public static class AssetManager
         PlayerTexture = Load<Texture2D>("Sprites/test");
         RoguelikeAtlas =  Load<Texture2D>("Sprites/Roguelike");
         Font =  Load<SpriteFont>("Fonts/Alagard");
+        BubblePopSound = Load<SoundEffect>("Sounds/BubblePop");
+        ExplosionSound = Load<SoundEffect>("Sounds/Explosion");
+        GameplaySong = Load<Song>("Sounds/Gameplay");
     }
     
     public static void Unload() => _content.Unload();
