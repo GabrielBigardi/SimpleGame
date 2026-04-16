@@ -14,7 +14,7 @@ public class SpriteDrawSystem
     public SpriteDrawSystem(World world, SpriteBatch spriteBatch)
     {
         _world = world;
-        _query = new QueryDescription().WithAll<Position, Sprite, Visible>();
+        _query = new QueryDescription().WithAll<Position, Sprite, Visible>().WithNone<Destroy>();
         _spriteUpdate = new SpriteDrawUpdate(spriteBatch);
     }
 

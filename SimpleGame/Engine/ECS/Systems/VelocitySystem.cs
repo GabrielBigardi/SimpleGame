@@ -14,7 +14,7 @@ public class VelocitySystem
     public VelocitySystem(World world)
     {
         _world = world;
-        _query = new QueryDescription().WithAll<Position, Velocity>();
+        _query = new QueryDescription().WithAll<Position, Velocity>().WithNone<Destroy>();
         _velocityUpdate = new VelocityUpdate();
     }
 

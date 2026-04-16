@@ -15,7 +15,7 @@ public class VisibleCheckSystem
     public VisibleCheckSystem(World world, CommandBuffer commandBuffer)
     {
         _world = world;
-        _query = new QueryDescription().WithAll<Position, Sprite, Visible>();
+        _query = new QueryDescription().WithAll<Position, Sprite, Visible>().WithNone<Destroy>();
         _visibilityBuffer  = commandBuffer;
         _visibleCheckUpdate = new VisibleCheckUpdate();
     }

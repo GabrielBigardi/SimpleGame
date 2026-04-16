@@ -14,6 +14,6 @@ public struct SpriteDrawUpdate : IForEach<Position, Sprite, Visible>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Update(ref Position pos, ref Sprite spr, ref Visible visible)
     {
-        _spriteBatch.Draw(spr.Texture, pos.Current, null, spr.Color, 0, spr.Origin, spr.Scale, SpriteEffects.None, 0f);
+        _spriteBatch.Draw(spr.Texture, pos.Current, spr.Source, spr.Color, 0, spr.Origin, spr.Scale, SpriteEffects.None, 0f);
     }
 }

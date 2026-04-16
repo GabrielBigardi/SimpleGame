@@ -21,18 +21,19 @@ public class Game1 : Game
     private JobScheduler _jobScheduler;
 
     private readonly CommandBuffer _visibilityBuffer = new();
-    
+    private readonly CommandBuffer _destroyBuffer = new();
+
     private VisibleCheckSystem _visibleSystem;
     private HiddenCheckSystem _hiddenSystem;
     private SpriteDrawSystem _spriteDrawSystem;
     private VelocitySystem _velocitySystem;
+    private EntityDestroySystem _destroySystem;
 
     private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
 
     public static int CachedPreferredBackBufferWidth;
     public static int CachedPreferredBackBufferHeight;
-    
 
     private Vector2 ScreenCenter => new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
 
@@ -71,7 +72,7 @@ public class Game1 : Game
                 ThreadPrefixName = "SimpleGame",
             }
         );
-        
+
         Console.WriteLine(_jobScheduler.ThreadCount);
 
         World.SharedJobScheduler = _jobScheduler;
@@ -79,6 +80,7 @@ public class Game1 : Game
         // Culling System (2 systems)
         _visibleSystem = new VisibleCheckSystem(_world, _visibilityBuffer);
         _hiddenSystem = new HiddenCheckSystem(_world, _visibilityBuffer);
+        _destroySystem = new EntityDestroySystem(_world, _destroyBuffer);
         _velocitySystem = new VelocitySystem(_world);
 
         base.Initialize();
@@ -121,9 +123,10 @@ public class Game1 : Game
                 var randomVelocity = VectorUtils.RandomInsideUnitCircle(_random);
                 randomVelocity.Normalize();
 
-                var scale = 0.25f;
+                var scale = 1f;
                 var randomColor = new Color(_random.Next(0, 256), _random.Next(0, 256), _random.Next(0, 256));
-                var origin = new Vector2(AssetManager.PlayerTexture.Width * 0.5f, AssetManager.PlayerTexture.Height * 0.5f);
+                var spriteSize = new[] { 16, 16 };
+                var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
                 var halfSize = origin * scale;
 
                 _world.Create(
@@ -131,10 +134,11 @@ public class Game1 : Game
                     new Velocity { Current = randomVelocity * 200f },
                     new Sprite
                     {
-                        Texture = AssetManager.PlayerTexture,
+                        Texture = AssetManager.RoguelikeAtlas,
                         Scale = Vector2.One * scale,
                         Color = randomColor,
                         Origin = origin,
+                        Source = new(144, 544, spriteSize[0], spriteSize[1]),
                         HalfSize = halfSize
                     },
                     new Visible()
@@ -150,20 +154,19 @@ public class Game1 : Game
         if (AssetManager.NeedsReload)
         {
             AssetManager.PerformReload();
-            
+
             var query = new QueryDescription().WithAll<Sprite>();
-            _world.Query(in query, (ref Sprite spr) =>
-            {
-                spr.Texture = AssetManager.PlayerTexture;
-            }); 
+            _world.Query(in query, (ref Sprite spr) => { spr.Texture = AssetManager.RoguelikeAtlas; });
         }
 #endif
 
         _velocitySystem.Update();
         _visibleSystem.Update();
         _hiddenSystem.Update();
-        
+        _destroySystem.Update();
+
         _visibilityBuffer.Playback(_world);
+        _destroyBuffer.Playback(_world);
 
         base.Update(gameTime);
     }
@@ -182,9 +185,9 @@ public class Game1 : Game
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
         _spriteBatch.DrawLine(new Vector2(ScreenCenter.X, 0f), new Vector2(ScreenCenter.X, ScreenCenter.Y * 2f),
-            new Color(255,0,0,64), 4f);
+            new Color(255, 0, 0, 64), 4f);
         _spriteBatch.DrawLine(new Vector2(0f, ScreenCenter.Y), new Vector2(ScreenCenter.X * 2f, ScreenCenter.Y),
-            new Color(255,0,0,64), 4f);
+            new Color(255, 0, 0, 64), 4f);
 
         var entitiesLabelText = "Entities:";
         var entitiesCountText = $"{_world.Size}";
@@ -197,7 +200,7 @@ public class Game1 : Game
             Color.White, 0f,
             FontUtils.CalculateFontOriginTopCenter(entitiesLabelText, AssetManager.Font), drawScale, SpriteEffects.None,
             0f, OutlineFlags.Cross, Color.Black);
-        
+
         _spriteBatch.DrawOutlinedString(AssetManager.Font, entitiesCountText,
             new Vector2(ScreenCenter.X, 10f + entitiesLabelSize.Y), Color.Red, 0f,
             FontUtils.CalculateFontOriginTopCenter(entitiesCountText, AssetManager.Font), drawScale, SpriteEffects.None,

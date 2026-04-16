@@ -10,12 +10,9 @@ public static class AssetManager
     private static ContentManager _content;
     
     public static Texture2D PlayerTexture;
-    public static Effect OutlineShader;
-    public static Effect InstancedDrawEffect;
+    public static Texture2D RoguelikeAtlas;
     public static SpriteFont Font;
-    
-    public static Texture2D LightGradientTexture;
-    public static Texture2D GameWorldTexture;
+
     
     public static bool NeedsReload { get; private set; }
     
@@ -44,9 +41,7 @@ public static class AssetManager
     {
         _content = content;
         PlayerTexture = Load<Texture2D>("Sprites/test");
-        LightGradientTexture  = Load<Texture2D>("Sprites/LightGradient");
-        GameWorldTexture = Load<Texture2D>("Sprites/stardewunlighted");
-        OutlineShader = Load<Effect>("Shaders/Outline");
+        RoguelikeAtlas =  Load<Texture2D>("Sprites/Roguelike");
         Font =  Load<SpriteFont>("Fonts/Alagard");
     }
     

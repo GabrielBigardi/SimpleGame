@@ -15,7 +15,7 @@ public class HiddenCheckSystem
     public HiddenCheckSystem(World world,  CommandBuffer commandBuffer)
     {
         _world = world;
-        _query = new QueryDescription().WithAll<Position, Sprite>().WithNone<Visible>();
+        _query = new QueryDescription().WithAll<Position, Sprite>().WithNone<Visible, Destroy>();
         _visibilityBuffer  = commandBuffer;
         _hiddenCheckUpdate = new HiddenCheckUpdate();
     }
