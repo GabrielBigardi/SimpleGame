@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Arch.Buffer;
 using Arch.Core;
@@ -124,21 +125,34 @@ public class Game1 : Game
                 randomVelocity.Normalize();
 
                 var scale = 1f;
-                var randomColor = new Color(_random.Next(0, 256), _random.Next(0, 256), _random.Next(0, 256));
+                var randomColor = ColorUtils.RandomColor(_random);
                 var spriteSize = new[] { 16, 16 };
                 var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
                 var halfSize = origin * scale;
 
+                var monstersStartSource = new ValueTuple<int, int>(64,496);
+                var spritesSourceList = new List<(int,int)>();
+                for (int x = 0; x < 10; x++)
+                {
+                    for (int y = 0; y < 3; y++)
+                    {
+                        var bla = new ValueTuple<int, int>(monstersStartSource.Item1 + spriteSize[0] * x, monstersStartSource.Item2 + spriteSize[0] * y);
+                        spritesSourceList.Add(bla);
+                    }
+                }
+                
+                var spriteToUse = spritesSourceList[_random.Next(spritesSourceList.Count)];
+
                 _world.Create(
                     new Position { Current = pos },
-                    new Velocity { Current = randomVelocity * 200f },
+                    new Velocity { Current = randomVelocity * 50f },
                     new Sprite
                     {
                         Texture = AssetManager.RoguelikeAtlas,
                         Scale = Vector2.One * scale,
-                        Color = randomColor,
+                        Color = Color.White,
                         Origin = origin,
-                        Source = new(144, 544, spriteSize[0], spriteSize[1]),
+                        Source = new(spriteToUse.Item1, spriteToUse.Item2, spriteSize[0], spriteSize[1]),
                         HalfSize = halfSize
                     },
                     new Visible()
@@ -175,7 +189,7 @@ public class Game1 : Game
     {
         // Draw the game
         GraphicsDevice.SetRenderTarget(null);
-        GraphicsDevice.Clear(Color.Black);
+        GraphicsDevice.Clear(new(59,48,78));
 
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
         _spriteDrawSystem.Update();
