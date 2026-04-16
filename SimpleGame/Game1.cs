@@ -89,7 +89,9 @@ public class Game1 : Game
         // If this is a AOT build add components to arrayregistry
         if (!RuntimeFeature.IsDynamicCodeSupported)
         {
+            ArrayRegistry.Add<Destroy>();
             ArrayRegistry.Add<Position>();
+            ArrayRegistry.Add<Shadow>();
             ArrayRegistry.Add<Sprite>();
             ArrayRegistry.Add<Velocity>();
             ArrayRegistry.Add<Visible>();
@@ -124,36 +126,47 @@ public class Game1 : Game
                 var randomVelocity = VectorUtils.RandomInsideUnitCircle(_random);
                 randomVelocity.Normalize();
 
-                var scale = 1f;
+                var scale = 2f;
                 var randomColor = ColorUtils.RandomColor(_random);
                 var spriteSize = new[] { 16, 16 };
                 var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
                 var halfSize = origin * scale;
 
-                var monstersStartSource = new ValueTuple<int, int>(64,496);
-                var spritesSourceList = new List<(int,int)>();
+                var monstersStartSource = new ValueTuple<int, int>(64, 496);
+                var spritesSourceList = new List<(int, int)>();
                 for (int x = 0; x < 10; x++)
                 {
                     for (int y = 0; y < 3; y++)
                     {
-                        var bla = new ValueTuple<int, int>(monstersStartSource.Item1 + spriteSize[0] * x, monstersStartSource.Item2 + spriteSize[0] * y);
+                        var bla = new ValueTuple<int, int>(monstersStartSource.Item1 + spriteSize[0] * x,
+                            monstersStartSource.Item2 + spriteSize[0] * y);
                         spritesSourceList.Add(bla);
                     }
                 }
-                
+
                 var spriteToUse = spritesSourceList[_random.Next(spritesSourceList.Count)];
 
+                // Create monster
                 _world.Create(
                     new Position { Current = pos },
-                    new Velocity { Current = randomVelocity * 50f },
+                    new Velocity { Current = randomVelocity * 200f },
                     new Sprite
                     {
                         Texture = AssetManager.RoguelikeAtlas,
                         Scale = Vector2.One * scale,
                         Color = Color.White,
                         Origin = origin,
-                        Source = new(spriteToUse.Item1, spriteToUse.Item2, spriteSize[0], spriteSize[1]),
+                        Source = new Rectangle(spriteToUse.Item1, spriteToUse.Item2, spriteSize[0], spriteSize[1]),
                         HalfSize = halfSize
+                    },
+                    new Shadow
+                    {
+                        Texture = AssetManager.RoguelikeAtlas,
+                        Scale = 1f,
+                        Offset = new Vector2(0f, 16f),
+                        //Origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f),
+                        Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
+                        Color = Color.Black * 0.5f
                     },
                     new Visible()
                 );
@@ -189,9 +202,10 @@ public class Game1 : Game
     {
         // Draw the game
         GraphicsDevice.SetRenderTarget(null);
-        GraphicsDevice.Clear(new(59,48,78));
+        GraphicsDevice.Clear(new(59, 48, 78));
 
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+        //_spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
+        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp);
         _spriteDrawSystem.Update();
         _spriteBatch.End();
 

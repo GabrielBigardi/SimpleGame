@@ -14,12 +14,12 @@ public class SpriteDrawSystem
     public SpriteDrawSystem(World world, SpriteBatch spriteBatch)
     {
         _world = world;
-        _query = new QueryDescription().WithAll<Position, Sprite, Visible>().WithNone<Destroy>();
+        _query = new QueryDescription().WithAll<Position, Sprite, Shadow, Visible>().WithNone<Destroy>();
         _spriteUpdate = new SpriteDrawUpdate(spriteBatch);
     }
 
     public void Update()
     {
-        _world.InlineQuery<SpriteDrawUpdate, Position, Sprite, Visible>(in _query, ref _spriteUpdate);
+        _world.InlineQuery<SpriteDrawUpdate, Position, Sprite, Shadow, Visible>(in _query, ref _spriteUpdate);
     }
 }
