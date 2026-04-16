@@ -244,7 +244,7 @@ public class Game1 : Game
             Shake(0.3f, 10f);
             
             var explosionInstance = AssetManager.ExplosionSound.CreateInstance();
-            explosionInstance.Pitch = _random.NextFloat(-1f, 0.25f);
+            explosionInstance.Pitch = _random.NextFloat(-0.575f, 0.2f);
             explosionInstance.Play();
             
             var query = new QueryDescription().WithAll<Sprite>();
