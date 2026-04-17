@@ -13,6 +13,7 @@ using Schedulers;
 using SimpleGame.Engine;
 using SimpleGame.Engine.ECS.Components;
 using SimpleGame.Engine.ECS.Systems;
+using SimpleGame.Engine.NonECS;
 using SimpleGame.Engine.Utils;
 
 namespace SimpleGame;
@@ -43,8 +44,17 @@ public class Game1 : Game
     private Random _random = new();
 
     private Entity _player;
-    private Vector2 _cameraPosition;
+
+    private RenderTarget2D _lightMaskTarget;
+
+    private LightSource _playerLight;
+    private readonly List<LightSource> _lightSources = new();
     
+    private List<(Vector2 A, Vector2 B)> _walls = new();
+    private BasicEffect _shadowEffect;
+
+    private Vector2 _cameraPosition;
+
     private float _shakeTime;
     private float _shakeDuration;
     private float _shakeStrength;
@@ -112,6 +122,11 @@ public class Game1 : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _spriteDrawSystem = new SpriteDrawSystem(_world, _spriteBatch);
+        
+        // Initialize lightmask
+        var presentationParameters = GraphicsDevice.PresentationParameters;
+        _lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth,
+            presentationParameters.BackBufferHeight);
 
         AssetManager.Load(Content);
 #if DEBUG
@@ -126,37 +141,74 @@ public class Game1 : Game
         var spriteSize = new[] { 16, 16 };
         var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
         var halfSize = origin * scale;
+
+        _player = _world.Create(
+            new Position { Current = ScreenCenter },
+            new Velocity(),
+            new Sprite
+            {
+                Texture = AssetManager.RoguelikeAtlas,
+                Scale = Vector2.One * scale,
+                Color = Color.White,
+                Origin = origin,
+                Source = new Rectangle(176, 544, spriteSize[0], spriteSize[1]),
+                HalfSize = halfSize
+            },
+            new Shadow
+            {
+                Texture = AssetManager.RoguelikeAtlas,
+                Scale = 1f,
+                Offset = new Vector2(0f, 16f),
+                //Origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f),
+                Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
+                Color = Color.Black * 0.5f
+            },
+            new Visible()
+        );
+
+        _playerLight = new LightSource()
+        {
+            Position = _player.Get<Position>().Current,
+            Scale = 6f,
+            Color = Color.White
+        };
         
-        _player =  _world.Create(
-                new Position { Current = ScreenCenter },
-                new Velocity(),
-                new Sprite
-                {
-                    Texture = AssetManager.RoguelikeAtlas,
-                    Scale = Vector2.One * scale,
-                    Color = Color.White,
-                    Origin = origin,
-                    Source = new Rectangle(176, 544, spriteSize[0], spriteSize[1]),
-                    HalfSize = halfSize
-                },
-                new Shadow
-                {
-                    Texture = AssetManager.RoguelikeAtlas,
-                    Scale = 1f,
-                    Offset = new Vector2(0f, 16f),
-                    //Origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f),
-                    Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
-                    Color = Color.Black * 0.5f
-                },
-                new Visible()
-            );
+        _lightSources.Add(_playerLight);
+        
+        Vector2 topLeft = new Vector2(400, 300);
+        Vector2 topRight = new Vector2(600, 300);
+        Vector2 bottomLeft = new Vector2(400, 500);
+        Vector2 bottomRight = new Vector2(600, 500);
+        
+        _walls.Add((topLeft, bottomLeft));     // Left edge (going down)
+        _walls.Add((bottomLeft, bottomRight)); // Bottom edge (going right)
+        _walls.Add((bottomRight, topRight));   // Right edge (going up)
+        _walls.Add((topRight, topLeft));       // Top edge (going left)
+        
+        
+        // Init shadow effect
+        _shadowEffect = new BasicEffect(GraphicsDevice)
+        {
+            VertexColorEnabled = true,
+            Projection = Matrix.CreateOrthographicOffCenter
+            (
+                0,
+                CachedPreferredBackBufferWidth,
+                CachedPreferredBackBufferHeight,
+                0,
+                0,
+                1
+            ),
+            View = Matrix.Identity,
+            World = GetCameraMatrix()
+        };
     }
 
     protected override void Update(GameTime gameTime)
     {
-        if (!IsActive) 
+        if (!IsActive)
             return;
-        
+
         if (_shakeTime > 0f)
         {
             _shakeTime -= TimeManager.DeltaTime;
@@ -172,7 +224,7 @@ public class Game1 : Game
         {
             _shakeOffset = Vector2.Zero;
         }
-        
+
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
@@ -182,7 +234,7 @@ public class Game1 : Game
             var bubblePopInstance = AssetManager.BubblePopSound.CreateInstance();
             bubblePopInstance.Pitch = _random.NextFloat(-1f, 1f);
             bubblePopInstance.Play();
-            
+
             for (var i = 0; i < 10; i++)
             {
                 var randomX = _random.Next(100, CachedPreferredBackBufferWidth - 100);
@@ -242,27 +294,29 @@ public class Game1 : Game
         if (InputManager.RightMousePressedThisFrame())
         {
             Shake(0.3f, 10f);
-            
+
             var explosionInstance = AssetManager.ExplosionSound.CreateInstance();
             explosionInstance.Pitch = _random.NextFloat(-0.575f, 0.2f);
             explosionInstance.Play();
-            
+
             var query = new QueryDescription().WithAll<Sprite>();
-            _world.Query(in query, (Entity entity, ref Sprite spr) => {
+            _world.Query(in query, (Entity entity, ref Sprite spr) =>
+            {
                 if (entity != _player)
                     entity.Add<Destroy>();
-            }); 
+            });
         }
 
         _player.Get<Velocity>().Current = InputManager.NormalizedPlayerInput * 100f;
-        
+        _playerLight.Position = _player.Get<Position>().Current;
+
         //_cameraPosition = _player.Get<Position>().Current;
         _cameraPosition = Vector2.Lerp(
             _cameraPosition,
             _player.Get<Position>().Current,
             10f * TimeManager.DeltaTime
         );
-        
+
         TimeManager.Update(gameTime);
         InputManager.Update();
         DayTimeManager.Update(TimeManager.DeltaTime);
@@ -290,22 +344,115 @@ public class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        // Draw lightmask
+        GraphicsDevice.SetRenderTarget(_lightMaskTarget);
+        GraphicsDevice.Clear(DayTimeManager.CurrentLighting);
+
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightCarveBlend, SamplerState.PointClamp, transformMatrix: GetCameraMatrix());
+
+        foreach (var lightSource in _lightSources)
+            lightSource.Draw(_spriteBatch, 1f);
+
+        _spriteBatch.End();
+        
+        
+        //TODO: CUT OUT SHADOWS
+// 1. Use Opaque to overwrite the light with the ambient darkness
+        GraphicsDevice.BlendState = BlendState.Opaque;
+        GraphicsDevice.RasterizerState = RasterizerState.CullNone;
+
+// 2. Properly route your matrices!
+        _shadowEffect.World = Matrix.Identity;
+        _shadowEffect.View = GetCameraMatrix(); // Camera goes in the View matrix
+        _shadowEffect.Projection = Matrix.CreateOrthographicOffCenter(
+            0, CachedPreferredBackBufferWidth, CachedPreferredBackBufferHeight, 0, 0, 1);
+
+        float shadowLength = 2000f;
+
+// 3. Our "eraser" ink is just the ambient lighting of the day
+        Color shadowColor = DayTimeManager.CurrentLighting;
+
+        foreach (var light in _lightSources)
+        {
+            foreach (var wall in _walls)
+            {
+                Vector2 a = wall.A;
+                Vector2 b = wall.B;
+
+                Vector2 edge = b - a;
+                Vector2 normal = new Vector2(-edge.Y, edge.X);
+
+                if (Vector2.Dot(normal, light.Position - a) <= 0)
+                    continue;
+
+                Vector2 dirA = Vector2.Normalize(a - light.Position);
+                Vector2 dirB = Vector2.Normalize(b - light.Position);
+
+                Vector2 aFar = a + dirA * shadowLength;
+                Vector2 bFar = b + dirB * shadowLength;
+
+                // Draw using the ambient color so it blends flawlessly with unlit areas
+                var verts = new VertexPositionColor[6]
+                {
+                    new(new Vector3(a, 0), shadowColor),
+                    new(new Vector3(b, 0), shadowColor),
+                    new(new Vector3(aFar, 0), shadowColor),
+
+                    new(new Vector3(b, 0), shadowColor),
+                    new(new Vector3(bFar, 0), shadowColor),
+                    new(new Vector3(aFar, 0), shadowColor),
+                };
+
+                foreach (var pass in _shadowEffect.CurrentTechnique.Passes)
+                {
+                    pass.Apply();
+                    GraphicsDevice.DrawUserPrimitives(
+                        PrimitiveType.TriangleList,
+                        verts,
+                        0,
+                        2
+                    );
+                }
+            }
+        }
+        
+
         // Draw the game
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(new(59, 48, 78));
 
         //_spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, transformMatrix: GetCameraMatrix());
+        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp,
+            transformMatrix: GetCameraMatrix());
         _spriteDrawSystem.Update();
+        
+        
+        foreach (var wall in _walls)
+        {
+            _spriteBatch.DrawLine(
+                wall.A,
+                wall.B,
+                Color.LimeGreen,
+                3f
+            );
+        }
+        
+        _spriteBatch.End();
+
+        // Apply Stardew like blending
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightingBlend);
+        _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, Color.White);
         _spriteBatch.End();
 
         // Draw UI
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
+        // Debug
         _spriteBatch.DrawLine(new Vector2(ScreenCenter.X, 0f), new Vector2(ScreenCenter.X, ScreenCenter.Y * 2f),
             new Color(255, 0, 0, 24), 4f);
         _spriteBatch.DrawLine(new Vector2(0f, ScreenCenter.Y), new Vector2(ScreenCenter.X * 2f, ScreenCenter.Y),
             new Color(255, 0, 0, 24), 4f);
+        
 
         var entitiesLabelText = "Entities:";
         var entitiesCountText = $"{_world.Size}";
@@ -337,14 +484,14 @@ public class Game1 : Game
         _jobScheduler.Dispose();
         _world.Dispose();
     }
-    
+
     private void Shake(float duration, float strength)
     {
         _shakeDuration = duration;
         _shakeTime = duration;
         _shakeStrength = strength;
     }
-    
+
     private Matrix GetCameraMatrix()
     {
         return Matrix.CreateTranslation(new Vector3(

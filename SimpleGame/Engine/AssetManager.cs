@@ -13,6 +13,7 @@ public static class AssetManager
     
     public static Texture2D PlayerTexture;
     public static Texture2D RoguelikeAtlas;
+    public static Texture2D LightGradientTexture;
     public static SpriteFont Font;
     public static SoundEffect BubblePopSound;
     public static SoundEffect ExplosionSound;
@@ -46,6 +47,7 @@ public static class AssetManager
         _content = content;
         PlayerTexture = Load<Texture2D>("Sprites/test");
         RoguelikeAtlas =  Load<Texture2D>("Sprites/Roguelike");
+        LightGradientTexture = Load<Texture2D>("Sprites/LightGradient");
         Font =  Load<SpriteFont>("Fonts/Alagard");
         BubblePopSound = Load<SoundEffect>("Sounds/BubblePop");
         ExplosionSound = Load<SoundEffect>("Sounds/Explosion");
