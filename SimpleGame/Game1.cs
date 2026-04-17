@@ -49,7 +49,7 @@ public class Game1 : Game
 
     private LightSource _playerLight;
     private readonly List<LightSource> _lightSources = new();
-    
+
     private List<(Vector2 A, Vector2 B)> _walls = new();
     private BasicEffect _shadowEffect;
 
@@ -122,11 +122,10 @@ public class Game1 : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _spriteDrawSystem = new SpriteDrawSystem(_world, _spriteBatch);
-        
+
         // Initialize lightmask
         var presentationParameters = GraphicsDevice.PresentationParameters;
-        _lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth,
-            presentationParameters.BackBufferHeight);
+        _lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth, presentationParameters.BackBufferHeight, mipMap: false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
 
         AssetManager.Load(Content);
 #if DEBUG
@@ -169,23 +168,23 @@ public class Game1 : Game
         _playerLight = new LightSource()
         {
             Position = _player.Get<Position>().Current,
-            Scale = 6f,
+            Scale = 3f,
             Color = Color.White
         };
-        
+
         _lightSources.Add(_playerLight);
-        
+
         Vector2 topLeft = new Vector2(400, 300);
         Vector2 topRight = new Vector2(600, 300);
         Vector2 bottomLeft = new Vector2(400, 500);
         Vector2 bottomRight = new Vector2(600, 500);
-        
-        _walls.Add((topLeft, bottomLeft));     // Left edge (going down)
+
+        _walls.Add((topLeft, bottomLeft)); // Left edge (going down)
         _walls.Add((bottomLeft, bottomRight)); // Bottom edge (going right)
-        _walls.Add((bottomRight, topRight));   // Right edge (going up)
-        _walls.Add((topRight, topLeft));       // Top edge (going left)
-        
-        
+        _walls.Add((bottomRight, topRight)); // Right edge (going up)
+        _walls.Add((topRight, topLeft)); // Top edge (going left)
+
+
         // Init shadow effect
         _shadowEffect = new BasicEffect(GraphicsDevice)
         {
@@ -202,6 +201,8 @@ public class Game1 : Game
             View = Matrix.Identity,
             World = GetCameraMatrix()
         };
+        
+        staminaRect = new Texture2D(base.GraphicsDevice, 1, 1, mipmap: false, SurfaceFormat.Color);
     }
 
     protected override void Update(GameTime gameTime)
@@ -348,61 +349,62 @@ public class Game1 : Game
         GraphicsDevice.SetRenderTarget(_lightMaskTarget);
         GraphicsDevice.Clear(DayTimeManager.CurrentLighting);
 
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightCarveBlend, SamplerState.PointClamp, transformMatrix: GetCameraMatrix());
-
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightCarveBlend, SamplerState.PointClamp, null, null, null, GetCameraMatrix());
+        
         foreach (var lightSource in _lightSources)
             lightSource.Draw(_spriteBatch, 1f);
 
         _spriteBatch.End();
-        
-        
+
+        _playerLight.Color = Color.White;
+
         //TODO: CUT OUT SHADOWS
-// 1. Use Opaque to overwrite the light with the ambient darkness
+        // 1. Use Opaque to overwrite the light with the ambient darkness
         GraphicsDevice.BlendState = BlendState.Opaque;
         GraphicsDevice.RasterizerState = RasterizerState.CullNone;
-
-// 2. Properly route your matrices!
+        
+        // 2. Properly route your matrices!
         _shadowEffect.World = Matrix.Identity;
         _shadowEffect.View = GetCameraMatrix(); // Camera goes in the View matrix
         _shadowEffect.Projection = Matrix.CreateOrthographicOffCenter(
             0, CachedPreferredBackBufferWidth, CachedPreferredBackBufferHeight, 0, 0, 1);
-
+        
         float shadowLength = 2000f;
-
-// 3. Our "eraser" ink is just the ambient lighting of the day
+        
+        // 3. Our "eraser" ink is just the ambient lighting of the day
         Color shadowColor = DayTimeManager.CurrentLighting;
-
+        
         foreach (var light in _lightSources)
         {
             foreach (var wall in _walls)
             {
                 Vector2 a = wall.A;
                 Vector2 b = wall.B;
-
+        
                 Vector2 edge = b - a;
                 Vector2 normal = new Vector2(-edge.Y, edge.X);
-
+        
                 if (Vector2.Dot(normal, light.Position - a) <= 0)
                     continue;
-
+        
                 Vector2 dirA = Vector2.Normalize(a - light.Position);
                 Vector2 dirB = Vector2.Normalize(b - light.Position);
-
+        
                 Vector2 aFar = a + dirA * shadowLength;
                 Vector2 bFar = b + dirB * shadowLength;
-
+        
                 // Draw using the ambient color so it blends flawlessly with unlit areas
                 var verts = new VertexPositionColor[6]
                 {
                     new(new Vector3(a, 0), shadowColor),
                     new(new Vector3(b, 0), shadowColor),
                     new(new Vector3(aFar, 0), shadowColor),
-
+        
                     new(new Vector3(b, 0), shadowColor),
                     new(new Vector3(bFar, 0), shadowColor),
                     new(new Vector3(aFar, 0), shadowColor),
                 };
-
+        
                 foreach (var pass in _shadowEffect.CurrentTechnique.Passes)
                 {
                     pass.Apply();
@@ -415,44 +417,41 @@ public class Game1 : Game
                 }
             }
         }
-        
 
         // Draw the game
         GraphicsDevice.SetRenderTarget(null);
-        GraphicsDevice.Clear(new(59, 48, 78));
+        GraphicsDevice.Clear(new(100,200,50));
 
-        //_spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
-        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp,
-            transformMatrix: GetCameraMatrix());
+         _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp,
+             transformMatrix: GetCameraMatrix());
         _spriteDrawSystem.Update();
-        
-        
+
         foreach (var wall in _walls)
         {
             _spriteBatch.DrawLine(
                 wall.A,
                 wall.B,
-                Color.LimeGreen,
+                Color.White,
                 3f
             );
         }
-        
+
         _spriteBatch.End();
 
         // Apply Stardew like blending
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightingBlend);
-        _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, Color.White);
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightingBlend, SamplerState.LinearClamp);
+        _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, _lightMaskTarget.Bounds, Color.White, 0f, Vector2.Zero, 1f, SpriteEffects.None, 1f);
         _spriteBatch.End();
 
         // Draw UI
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
 
         // Debug
-        _spriteBatch.DrawLine(new Vector2(ScreenCenter.X, 0f), new Vector2(ScreenCenter.X, ScreenCenter.Y * 2f),
-            new Color(255, 0, 0, 24), 4f);
-        _spriteBatch.DrawLine(new Vector2(0f, ScreenCenter.Y), new Vector2(ScreenCenter.X * 2f, ScreenCenter.Y),
-            new Color(255, 0, 0, 24), 4f);
-        
+        //_spriteBatch.DrawLine(new Vector2(ScreenCenter.X, 0f), new Vector2(ScreenCenter.X, ScreenCenter.Y * 2f),
+        //    new Color(255, 0, 0, 24), 4f);
+        //_spriteBatch.DrawLine(new Vector2(0f, ScreenCenter.Y), new Vector2(ScreenCenter.X * 2f, ScreenCenter.Y),
+        //    new Color(255, 0, 0, 24), 4f);
+
 
         var entitiesLabelText = "Entities:";
         var entitiesCountText = $"{_world.Size}";

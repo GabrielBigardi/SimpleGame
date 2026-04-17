@@ -4,7 +4,7 @@ namespace SimpleGame.Engine;
 
 public static class DayTimeManager
 {
-    public static Color CurrentLighting = Color.Black;
+    public static Color CurrentLighting = new Color(255, 255, 0, 255);
     
     private static float _currentTime;
 
@@ -17,6 +17,7 @@ public static class DayTimeManager
         var finalIntensity = baseIntensity * maxLighting;
         //CurrentLighting = new Color(finalIntensity, finalIntensity, 0f, 255);
         
-        CurrentLighting = new Color(225, 225, 0, 255);
+        CurrentLighting = new Color(200, 200, 0, 255);
+        //CurrentLighting = new Color(225, 225, 225, 255);
     }
 }
