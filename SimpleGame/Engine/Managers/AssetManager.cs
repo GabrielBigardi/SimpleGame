@@ -7,6 +7,8 @@ using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Media;
 
+namespace SimpleGame.Engine.Managers;
+
 public static class AssetManager
 {
     private static ContentManager _content;
