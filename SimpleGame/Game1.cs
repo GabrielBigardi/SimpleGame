@@ -168,8 +168,8 @@ public class Game1 : Game
         _playerLight = new LightSource()
         {
             Position = _player.Get<Position>().Current,
-            Scale = 3f,
-            Color = Color.White
+            Scale = 4f,
+            Color = Color.White,
         };
 
         _lightSources.Add(_playerLight);
@@ -201,8 +201,6 @@ public class Game1 : Game
             View = Matrix.Identity,
             World = GetCameraMatrix()
         };
-        
-        staminaRect = new Texture2D(base.GraphicsDevice, 1, 1, mipmap: false, SurfaceFormat.Color);
     }
 
     protected override void Update(GameTime gameTime)
@@ -347,16 +345,17 @@ public class Game1 : Game
     {
         // Draw lightmask
         GraphicsDevice.SetRenderTarget(_lightMaskTarget);
-        GraphicsDevice.Clear(DayTimeManager.CurrentLighting);
+        
+        Color ambientDarkness = new Color(0,0,40); 
+        GraphicsDevice.Clear(ambientDarkness);
 
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightCarveBlend, SamplerState.PointClamp, null, null, null, GetCameraMatrix());
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp, null, null, null, GetCameraMatrix());
         
         foreach (var lightSource in _lightSources)
             lightSource.Draw(_spriteBatch, 1f);
 
         _spriteBatch.End();
 
-        _playerLight.Color = Color.White;
 
         //TODO: CUT OUT SHADOWS
         // 1. Use Opaque to overwrite the light with the ambient darkness
@@ -372,7 +371,7 @@ public class Game1 : Game
         float shadowLength = 2000f;
         
         // 3. Our "eraser" ink is just the ambient lighting of the day
-        Color shadowColor = DayTimeManager.CurrentLighting;
+        Color shadowColor = ambientDarkness;
         
         foreach (var light in _lightSources)
         {
@@ -422,8 +421,7 @@ public class Game1 : Game
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(new(100,200,50));
 
-         _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp,
-             transformMatrix: GetCameraMatrix());
+         _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, transformMatrix: GetCameraMatrix());
         _spriteDrawSystem.Update();
 
         foreach (var wall in _walls)
@@ -439,7 +437,7 @@ public class Game1 : Game
         _spriteBatch.End();
 
         // Apply Stardew like blending
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.LightingBlend, SamplerState.LinearClamp);
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.MultiplyBlend, SamplerState.LinearClamp);
         _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, _lightMaskTarget.Bounds, Color.White, 0f, Vector2.Zero, 1f, SpriteEffects.None, 1f);
         _spriteBatch.End();
 
