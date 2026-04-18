@@ -33,20 +33,22 @@ public class Game1 : Game
     private SpriteDrawSystem _spriteDrawSystem;
     private VelocitySystem _velocitySystem;
     private EntityDestroySystem _destroySystem;
+    private SpriteFlipSystem _spriteFlipSystem;
     #endregion
 
     #region Monogame
-    private GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch;
     #endregion
     
     #region Lighting
     private RenderTarget2D _lightMaskTarget;
     
+    // Lights
     private LightSource _playerLight;
-    private readonly List<LightSource> _lightSources = new();
+    private readonly List<LightSource> _lightSources = [];
 
-    private readonly List<(Vector2 A, Vector2 B)> _walls = new();
+    // Shadows
+    private readonly List<(Vector2 A, Vector2 B)> _walls = [];
     private BasicEffect _shadowEffect;
     #endregion
     
@@ -55,30 +57,30 @@ public class Game1 : Game
 
     public static Vector2 ScreenCenter => new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
 
-    private Random _random = new();
+    private readonly Random _random = new();
     private Entity _player;
 
     public Game1()
     {
-        _graphics = new GraphicsDeviceManager(this);
+        var graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
 
-        _graphics.PreferredBackBufferWidth = 1280;
-        _graphics.PreferredBackBufferHeight = 720;
+        graphics.PreferredBackBufferWidth = 1280;
+        graphics.PreferredBackBufferHeight = 720;
 
         CachedPreferredBackBufferWidth = 1280;
         CachedPreferredBackBufferHeight = 720;
 
         // Unlimited FPS
-        _graphics.SynchronizeWithVerticalRetrace = false;
+        graphics.SynchronizeWithVerticalRetrace = false;
         IsFixedTimeStep = false;
 
         // Limited FPS
         // IsFixedTimeStep = true;
         // TargetElapsedTime = TimeSpan.FromSeconds(1d / 60d);
 
-        _graphics.ApplyChanges();
+        graphics.ApplyChanges();
     }
 
     protected override void Initialize()
@@ -100,6 +102,7 @@ public class Game1 : Game
         _hiddenSystem = new HiddenCheckSystem(_world, _visibilityBuffer);
         _destroySystem = new EntityDestroySystem(_world, _destroyBuffer);
         _velocitySystem = new VelocitySystem(_world);
+        _spriteFlipSystem = new SpriteFlipSystem(_world);
 
         base.Initialize();
 
@@ -120,7 +123,7 @@ public class Game1 : Game
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _spriteDrawSystem = new SpriteDrawSystem(_world, _spriteBatch);
 
-        // Initialize lightmask
+        // Initialize light mask
         var presentationParameters = GraphicsDevice.PresentationParameters;
         _lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth, presentationParameters.BackBufferHeight, mipMap: false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
 
@@ -171,10 +174,10 @@ public class Game1 : Game
 
         _lightSources.Add(_playerLight);
 
-        Vector2 topLeft = new Vector2(400, 300);
-        Vector2 topRight = new Vector2(600, 300);
-        Vector2 bottomLeft = new Vector2(400, 500);
-        Vector2 bottomRight = new Vector2(600, 500);
+        var topLeft = new Vector2(400, 300);
+        var topRight = new Vector2(600, 300);
+        var bottomLeft = new Vector2(400, 500);
+        var bottomRight = new Vector2(600, 500);
 
         _walls.Add((topLeft, bottomLeft)); // Left edge (going down)
         _walls.Add((bottomLeft, bottomRight)); // Bottom edge (going right)
@@ -317,6 +320,7 @@ public class Game1 : Game
         _visibleSystem.Update();
         _hiddenSystem.Update();
         _destroySystem.Update();
+        _spriteFlipSystem.Update();
 
         _visibilityBuffer.Playback(_world);
         _destroyBuffer.Playback(_world);
@@ -326,7 +330,7 @@ public class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        var ambientDarkness = new Color(0,0,40); 
+        var ambientDarkness = DayTimeManager.CurrentLighting;
         
         DrawLightmap(ambientDarkness);
         DrawCutoutShadows(ambientDarkness);

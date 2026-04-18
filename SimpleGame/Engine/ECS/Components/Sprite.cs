@@ -12,4 +12,5 @@ public struct Sprite
     public Rectangle Source;
     public Color Color;
     public float LayerDepth;
+    public int FlipX;
 }

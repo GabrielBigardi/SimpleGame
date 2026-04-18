@@ -4,20 +4,25 @@ namespace SimpleGame.Engine;
 
 public static class DayTimeManager
 {
-    public static Color CurrentLighting = new Color(255, 255, 0, 255);
-    
+    private static readonly Color FullBrightColor = Color.White;
+    private static readonly Color FullDarkColor = new Color(20, 20, 60);
+
+    public static Color CurrentLighting = Color.White;
+
     private static float _currentTime;
+    private const float CYCLE_SPEED = 0.05f;
 
     public static void Update(float deltaTime)
     {
-        _currentTime += deltaTime * 0.05f;
+        _currentTime += deltaTime * CYCLE_SPEED;
         _currentTime %= 2f;
-        var baseIntensity = _currentTime <= 1f ? _currentTime : 2f - _currentTime;
-        var maxLighting = 0.8625f;
-        var finalIntensity = baseIntensity * maxLighting;
-        //CurrentLighting = new Color(finalIntensity, finalIntensity, 0f, 255);
-        
-        CurrentLighting = new Color(200, 200, 0, 255);
-        //CurrentLighting = new Color(225, 225, 225, 255);
+
+        // Creates a smooth 0 -> 1 -> 0 cycle
+        var t = _currentTime <= 1f
+            ? _currentTime
+            : 2f - _currentTime;
+
+        // Blend between dark and bright
+        CurrentLighting = Color.Lerp(FullDarkColor, FullBrightColor, t);
     }
 }

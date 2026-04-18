@@ -7,7 +7,7 @@ namespace SimpleGame.Engine.NonECS;
 public class LightSource
 {
     public Vector2 Position;
-    public Vector2 Origin => new(AssetManager.LightGradientTexture .Width / 2f, AssetManager.LightGradientTexture.Height / 2f);
+    private Vector2 Origin => new(AssetManager.LightGradientTexture .Width * 0.5f, AssetManager.LightGradientTexture.Height * 0.5f);
     public Color Color;
     public float Scale;
 
@@ -15,8 +15,8 @@ public class LightSource
     {
         if (debugRect)
         {
-            var bla = new Vector2(AssetManager.LightGradientTexture.Width, AssetManager.LightGradientTexture.Height) * Scale;
-            spriteBatch.DrawRectangle(Position - bla / 2f, bla, Color, 4f);
+            var scale = new Vector2(AssetManager.LightGradientTexture.Width, AssetManager.LightGradientTexture.Height) * Scale;
+            spriteBatch.DrawRectangle(Position - scale * 0.5f, scale, Color, 4f);
         }
         
         spriteBatch.Draw(AssetManager.LightGradientTexture, Position, null, Color * intensity, 0f, Origin, Scale, SpriteEffects.None, 0f);

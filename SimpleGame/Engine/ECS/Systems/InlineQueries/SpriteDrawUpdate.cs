@@ -19,7 +19,7 @@ public struct SpriteDrawUpdate : IForEach<Position, Sprite, Shadow, Visible>
         _spriteBatch.Draw(shadow.Texture, pos.Current + shadow.Offset, shadow.Source, shadow.Color, 0,
             spr.Origin, spr.Scale * shadow.Scale, SpriteEffects.None, 0);
 
-        _spriteBatch.Draw(spr.Texture, pos.Current, spr.Source, spr.Color, 0, spr.Origin, spr.Scale, SpriteEffects.None,
+        _spriteBatch.Draw(spr.Texture, pos.Current, spr.Source, spr.Color, 0, spr.Origin, spr.Scale, (SpriteEffects)spr.FlipX,
             pos.Current.Y * 0.0001f);
     }
 }
