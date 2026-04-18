@@ -15,7 +15,7 @@ public class LightDrawSystem
     public LightDrawSystem(World world, SpriteBatch spriteBatch)
     {
         _world = world;
-        _query = new QueryDescription().WithAll<Position, LightSource, Visible>().WithNone<Destroy>();
+        _query = new QueryDescription().WithAll<Position, LightSource, Visible>().WithNone<Destroy, ShadowEmitter>();
         _lightDrawUpdate = new LightDrawUpdate(spriteBatch);
     }
 

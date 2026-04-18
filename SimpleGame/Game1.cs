@@ -20,6 +20,7 @@ namespace SimpleGame;
 public class Game1 : Game
 {
     #region ECS
+
     private World _world;
     private JobScheduler _jobScheduler;
 
@@ -33,24 +34,33 @@ public class Game1 : Game
     private VelocitySystem _velocitySystem;
     private EntityDestroySystem _destroySystem;
     private SpriteFlipSystem _spriteFlipSystem;
+
     #endregion
 
     #region Monogame
+
     private SpriteBatch _spriteBatch;
+
     #endregion
-    
+
     #region Lighting
+
     private RenderTarget2D _lightMaskTarget;
 
     // Shadows
     private readonly List<(Vector2 A, Vector2 B)> _walls = [];
     private BasicEffect _shadowEffect;
+
+    private readonly DepthStencilState[] _writeStencilStates = new DepthStencilState[256];
+    private readonly DepthStencilState[] _readStencilStates = new DepthStencilState[256];
+
     #endregion
-    
+
     public static int CachedPreferredBackBufferWidth;
     public static int CachedPreferredBackBufferHeight;
 
-    public static Vector2 ScreenCenter => new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
+    public static Vector2 ScreenCenter =>
+        new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
 
     private readonly Random _random = new();
     private Entity _player;
@@ -105,8 +115,10 @@ public class Game1 : Game
         if (!RuntimeFeature.IsDynamicCodeSupported)
         {
             ArrayRegistry.Add<Destroy>();
+            ArrayRegistry.Add<LightSource>();
             ArrayRegistry.Add<Position>();
             ArrayRegistry.Add<Shadow>();
+            ArrayRegistry.Add<ShadowEmitter>();
             ArrayRegistry.Add<Sprite>();
             ArrayRegistry.Add<Velocity>();
             ArrayRegistry.Add<Visible>();
@@ -121,7 +133,40 @@ public class Game1 : Game
 
         // Initialize light mask
         var presentationParameters = GraphicsDevice.PresentationParameters;
-        _lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth, presentationParameters.BackBufferHeight, mipMap: false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+
+        //_lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth, presentationParameters.BackBufferHeight, mipMap: false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
+
+        _lightMaskTarget = new RenderTarget2D(
+            GraphicsDevice,
+            presentationParameters.BackBufferWidth,
+            presentationParameters.BackBufferHeight,
+            false,
+            SurfaceFormat.Color,
+            DepthFormat.Depth24Stencil8, // <--- CRITICAL: Enables the Stencil Buffer
+            0,
+            RenderTargetUsage.PreserveContents
+        );
+
+        // Generate our 255 stencil states once during load
+        for (int i = 0; i < 256; i++)
+        {
+            _writeStencilStates[i] = new DepthStencilState
+            {
+                StencilEnable = true,
+                StencilFunction = CompareFunction.Always,
+                StencilPass = StencilOperation.Replace,
+                ReferenceStencil = i,
+                DepthBufferEnable = false
+            };
+
+            _readStencilStates[i] = new DepthStencilState
+            {
+                StencilEnable = true,
+                StencilFunction = CompareFunction.NotEqual,
+                ReferenceStencil = i,
+                DepthBufferEnable = false
+            };
+        }
 
         AssetManager.Load(Content);
 #if DEBUG
@@ -165,6 +210,7 @@ public class Game1 : Game
                 Origin = new(AssetManager.LightGradientTexture.Width * 0.5f,
                     AssetManager.LightGradientTexture.Height * 0.5f)
             },
+            new ShadowEmitter(),
             new Visible()
         );
 
@@ -177,7 +223,7 @@ public class Game1 : Game
         _walls.Add((bottomLeft, bottomRight)); // Bottom edge (going right)
         _walls.Add((bottomRight, topRight)); // Right edge (going up)
         _walls.Add((topRight, topLeft)); // Top edge (going left)
-        
+
         // Init shadow effect
         _shadowEffect = new BasicEffect(GraphicsDevice)
         {
@@ -202,7 +248,7 @@ public class Game1 : Game
     {
         if (!IsActive)
             return;
-        
+
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
@@ -266,10 +312,12 @@ public class Game1 : Game
                     },
                     new LightSource()
                     {
-                        Color = Color.Purple * 0.8f,
-                        Origin = new(AssetManager.LightGradientTexture.Width *  0.5f, AssetManager.LightGradientTexture.Height * 0.5f),
-                        Scale = 2f
+                        Color = Color.Purple * 1f,
+                        Origin = new(AssetManager.LightGradientTexture.Width * 0.5f,
+                            AssetManager.LightGradientTexture.Height * 0.5f),
+                        Scale = 4f
                     },
+                    //new ShadowEmitter(),
                     new Visible()
                 );
             }
@@ -330,96 +378,108 @@ public class Game1 : Game
     protected override void Draw(GameTime gameTime)
     {
         var ambientDarkness = DayTimeManager.CurrentLighting;
-        
-        DrawLightmap(ambientDarkness);
-        DrawCutoutShadows(ambientDarkness);
+
+        DrawLightmapAndBasicLights(ambientDarkness);
+        DrawShadowEmittingLights(ambientDarkness);
+        //DrawCutoutShadows(ambientDarkness);
+
         DrawGame();
         DrawBlendedLightmap();
         DrawUI();
-     
+
         base.Draw(gameTime);
     }
-    
-    private void DrawLightmap(Color ambientDarkness)
-    {
-        // Draw lightmask
-        GraphicsDevice.SetRenderTarget(_lightMaskTarget);
-        GraphicsDevice.Clear(ambientDarkness);
 
+    private void DrawShadowEmittingLights(Color ambientDarkness)
+    {
+        var noColorWriteBlend = new BlendState { ColorWriteChannels = ColorWriteChannels.None };
+
+        _shadowEffect.World = Matrix.Identity;
+        _shadowEffect.View = CameraManager.GetCameraMatrix();
+        _shadowEffect.Projection = Matrix.CreateOrthographicOffCenter(0, CachedPreferredBackBufferWidth,
+            CachedPreferredBackBufferHeight, 0, 0, 1);
+
+        int stencilRef = 1; // Start at ID 1
+
+        var query = new QueryDescription().WithAll<Position, LightSource, ShadowEmitter>();
+        _world.Query(in query, (ref Position pos, ref LightSource light, ref ShadowEmitter emitter) =>
+        {
+            if (stencilRef > 255)
+            {
+                GraphicsDevice.Clear(ClearOptions.Stencil, Color.Transparent, 0, 0);
+                stencilRef = 1;
+            }
+
+            // Grab the PRE-CACHED write state for this ID
+            GraphicsDevice.DepthStencilState = _writeStencilStates[stencilRef];
+            GraphicsDevice.BlendState = noColorWriteBlend;
+            GraphicsDevice.RasterizerState = RasterizerState.CullNone;
+
+            float shadowLength = 2000f;
+
+            foreach (var wall in _walls)
+            {
+                Vector2 a = wall.A;
+                Vector2 b = wall.B;
+
+                Vector2 edge = b - a;
+                Vector2 normal = new Vector2(-edge.Y, edge.X);
+
+                if (Vector2.Dot(normal, pos.Current - a) <= 0) continue;
+
+                Vector2 dirA = Vector2.Normalize(a - pos.Current);
+                Vector2 dirB = Vector2.Normalize(b - pos.Current);
+
+                var verts = new VertexPositionColor[6]
+                {
+                    new(new Vector3(a, 0), Color.White), new(new Vector3(b, 0), Color.White),
+                    new(new Vector3(a + dirA * shadowLength, 0), Color.White),
+                    new(new Vector3(b, 0), Color.White), new(new Vector3(b + dirB * shadowLength, 0), Color.White),
+                    new(new Vector3(a + dirA * shadowLength, 0), Color.White),
+                };
+
+                foreach (var pass in _shadowEffect.CurrentTechnique.Passes)
+                {
+                    pass.Apply();
+                    GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleList, verts, 0, 2);
+                }
+            }
+
+            // Grab the PRE-CACHED read state for this ID
+            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp,
+                _readStencilStates[stencilRef], RasterizerState.CullNone, null, CameraManager.GetCameraMatrix());
+
+            _spriteBatch.Draw(AssetManager.LightGradientTexture, pos.Current, null, light.Color, 0f, light.Origin,
+                light.Scale, SpriteEffects.None, 0f);
+
+            _spriteBatch.End();
+
+            // Increment the ID for the next light!
+            stencilRef++;
+        });
+    }
+
+    private void DrawLightmapAndBasicLights(Color ambientDarkness)
+    {
+        // Clear lightmap/stencil buffer
+        GraphicsDevice.SetRenderTarget(_lightMaskTarget);
+        GraphicsDevice.Clear(ClearOptions.Target | ClearOptions.Stencil, ambientDarkness, 0, 0);
+
+        // Draw lights in a additive way
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp, null, null, null, CameraManager.GetCameraMatrix());
-        
+
         _lightDrawSystem.Update();
 
         _spriteBatch.End();
     }
 
-    private void DrawCutoutShadows(Color ambientDarkness)
-    {
-        GraphicsDevice.BlendState = BlendState.Opaque;
-        GraphicsDevice.RasterizerState = RasterizerState.CullNone;
-
-        _shadowEffect.World = Matrix.Identity;
-        _shadowEffect.View = CameraManager.GetCameraMatrix();
-        _shadowEffect.Projection = Matrix.CreateOrthographicOffCenter(0, CachedPreferredBackBufferWidth, CachedPreferredBackBufferHeight, 0, 0, 1);
-        
-        var shadowLength = 2000f;
-        
-        // 3. Our "eraser" ink is just the ambient lighting of the day
-        var shadowColor = ambientDarkness;
-        
-        var query = new QueryDescription().WithAll<Position, LightSource>();
-        _world.Query(in query, (ref Position position, ref LightSource light) =>
-        {
-            foreach (var wall in _walls)
-            {
-                Vector2 a = wall.A;
-                Vector2 b = wall.B;
-        
-                Vector2 edge = b - a;
-                Vector2 normal = new Vector2(-edge.Y, edge.X);
-        
-                if (Vector2.Dot(normal, position.Current - a) <= 0)
-                    continue;
-        
-                Vector2 dirA = Vector2.Normalize(a - position.Current);
-                Vector2 dirB = Vector2.Normalize(b - position.Current);
-        
-                Vector2 aFar = a + dirA * shadowLength;
-                Vector2 bFar = b + dirB * shadowLength;
-        
-                // Draw using the ambient color so it blends flawlessly with unlit areas
-                var verts = new VertexPositionColor[6]
-                {
-                    new(new Vector3(a, 0), shadowColor),
-                    new(new Vector3(b, 0), shadowColor),
-                    new(new Vector3(aFar, 0), shadowColor),
-        
-                    new(new Vector3(b, 0), shadowColor),
-                    new(new Vector3(bFar, 0), shadowColor),
-                    new(new Vector3(aFar, 0), shadowColor),
-                };
-        
-                foreach (var pass in _shadowEffect.CurrentTechnique.Passes)
-                {
-                    pass.Apply();
-                    GraphicsDevice.DrawUserPrimitives(
-                        PrimitiveType.TriangleList,
-                        verts,
-                        0,
-                        2
-                    );
-                }
-            }
-        });
-    }
-
     private void DrawGame()
     {
-        // Draw the game
         GraphicsDevice.SetRenderTarget(null);
-        GraphicsDevice.Clear(new(59,48,78));
+        GraphicsDevice.Clear(new(59, 48, 78));
 
-        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, transformMatrix: CameraManager.GetCameraMatrix());
+        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp,
+            transformMatrix: CameraManager.GetCameraMatrix());
         _spriteDrawSystem.Update();
 
         foreach (var wall in _walls)
@@ -437,9 +497,9 @@ public class Game1 : Game
 
     private void DrawBlendedLightmap()
     {
-        // Apply Stardew like blending
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.MultiplyBlend, SamplerState.LinearClamp);
-        _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, _lightMaskTarget.Bounds, Color.White, 0f, Vector2.Zero, 1f, SpriteEffects.None, 1f);
+        _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, _lightMaskTarget.Bounds, Color.White, 0f, Vector2.Zero, 1f,
+            SpriteEffects.None, 1f);
         _spriteBatch.End();
     }
 
