@@ -5,7 +5,6 @@ using Arch.Buffer;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Media;
@@ -14,7 +13,6 @@ using SimpleGame.Engine;
 using SimpleGame.Engine.ECS.Components;
 using SimpleGame.Engine.ECS.Systems;
 using SimpleGame.Engine.Managers;
-using SimpleGame.Engine.NonECS;
 using SimpleGame.Engine.Utils;
 
 namespace SimpleGame;
@@ -31,6 +29,7 @@ public class Game1 : Game
     private VisibleCheckSystem _visibleSystem;
     private HiddenCheckSystem _hiddenSystem;
     private SpriteDrawSystem _spriteDrawSystem;
+    private LightDrawSystem _lightDrawSystem;
     private VelocitySystem _velocitySystem;
     private EntityDestroySystem _destroySystem;
     private SpriteFlipSystem _spriteFlipSystem;
@@ -42,10 +41,6 @@ public class Game1 : Game
     
     #region Lighting
     private RenderTarget2D _lightMaskTarget;
-    
-    // Lights
-    private LightSource _playerLight;
-    private readonly List<LightSource> _lightSources = [];
 
     // Shadows
     private readonly List<(Vector2 A, Vector2 B)> _walls = [];
@@ -122,6 +117,7 @@ public class Game1 : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _spriteDrawSystem = new SpriteDrawSystem(_world, _spriteBatch);
+        _lightDrawSystem = new LightDrawSystem(_world, _spriteBatch);
 
         // Initialize light mask
         var presentationParameters = GraphicsDevice.PresentationParameters;
@@ -162,17 +158,15 @@ public class Game1 : Game
                 Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
                 Color = Color.Black * 0.5f
             },
+            new LightSource()
+            {
+                Scale = 4f,
+                Color = Color.White,
+                Origin = new(AssetManager.LightGradientTexture.Width * 0.5f,
+                    AssetManager.LightGradientTexture.Height * 0.5f)
+            },
             new Visible()
         );
-
-        _playerLight = new LightSource()
-        {
-            Position = _player.Get<Position>().Current,
-            Scale = 4f,
-            Color = Color.White,
-        };
-
-        _lightSources.Add(_playerLight);
 
         var topLeft = new Vector2(400, 300);
         var topRight = new Vector2(600, 300);
@@ -251,7 +245,7 @@ public class Game1 : Game
                 // Create monster
                 _world.Create(
                     new Position { Current = pos },
-                    new Velocity { Current = randomVelocity * 50f },
+                    new Velocity { Current = randomVelocity * 1f },
                     new Sprite
                     {
                         Texture = AssetManager.RoguelikeAtlas,
@@ -269,6 +263,12 @@ public class Game1 : Game
                         //Origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f),
                         Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
                         Color = Color.Black * 0.5f
+                    },
+                    new LightSource()
+                    {
+                        Color = Color.Purple * 0.8f,
+                        Origin = new(AssetManager.LightGradientTexture.Width *  0.5f, AssetManager.LightGradientTexture.Height * 0.5f),
+                        Scale = 2f
                     },
                     new Visible()
                 );
@@ -292,7 +292,6 @@ public class Game1 : Game
         }
 
         _player.Get<Velocity>().Current = InputManager.NormalizedPlayerInput * 100f;
-        _playerLight.Position = _player.Get<Position>().Current;
 
         //_cameraPosition = _player.Get<Position>().Current;
         CameraManager.SetCameraPosition(Vector2.Lerp(
@@ -349,8 +348,7 @@ public class Game1 : Game
 
         _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp, null, null, null, CameraManager.GetCameraMatrix());
         
-        foreach (var lightSource in _lightSources)
-            lightSource.Draw(_spriteBatch, 1f);
+        _lightDrawSystem.Update();
 
         _spriteBatch.End();
     }
@@ -369,7 +367,8 @@ public class Game1 : Game
         // 3. Our "eraser" ink is just the ambient lighting of the day
         var shadowColor = ambientDarkness;
         
-        foreach (var light in _lightSources)
+        var query = new QueryDescription().WithAll<Position, LightSource>();
+        _world.Query(in query, (ref Position position, ref LightSource light) =>
         {
             foreach (var wall in _walls)
             {
@@ -379,11 +378,11 @@ public class Game1 : Game
                 Vector2 edge = b - a;
                 Vector2 normal = new Vector2(-edge.Y, edge.X);
         
-                if (Vector2.Dot(normal, light.Position - a) <= 0)
+                if (Vector2.Dot(normal, position.Current - a) <= 0)
                     continue;
         
-                Vector2 dirA = Vector2.Normalize(a - light.Position);
-                Vector2 dirB = Vector2.Normalize(b - light.Position);
+                Vector2 dirA = Vector2.Normalize(a - position.Current);
+                Vector2 dirB = Vector2.Normalize(b - position.Current);
         
                 Vector2 aFar = a + dirA * shadowLength;
                 Vector2 bFar = b + dirB * shadowLength;
@@ -411,14 +410,14 @@ public class Game1 : Game
                     );
                 }
             }
-        }
+        });
     }
 
     private void DrawGame()
     {
         // Draw the game
         GraphicsDevice.SetRenderTarget(null);
-        GraphicsDevice.Clear(new(100,200,50));
+        GraphicsDevice.Clear(new(59,48,78));
 
         _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, transformMatrix: CameraManager.GetCameraMatrix());
         _spriteDrawSystem.Update();

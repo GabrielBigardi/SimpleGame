@@ -5,7 +5,7 @@ namespace SimpleGame.Engine;
 public static class DayTimeManager
 {
     private static readonly Color FullBrightColor = Color.White;
-    private static readonly Color FullDarkColor = new Color(20, 20, 60);
+    private static readonly Color FullDarkColor = new(20, 20, 60);
 
     public static Color CurrentLighting = Color.White;
 
@@ -23,6 +23,7 @@ public static class DayTimeManager
             : 2f - _currentTime;
 
         // Blend between dark and bright
-        CurrentLighting = Color.Lerp(FullDarkColor, FullBrightColor, t);
+        //CurrentLighting = Color.Lerp(FullDarkColor, FullBrightColor, t);
+        CurrentLighting = FullDarkColor;
     }
 }
