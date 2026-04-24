@@ -2,6 +2,7 @@
 using Arch.Core;
 using SimpleGame.Engine.ECS.Components;
 using SimpleGame.Engine.ECS.Systems.InlineQueries;
+using SimpleGame.Engine.Managers;
 
 namespace SimpleGame.Engine.ECS.Systems;
 
@@ -22,9 +23,15 @@ public class VisibleCheckSystem
 
     public void Update()
     {
+        var worldWidth = Game1._graphics.PreferredBackBufferWidth / CameraManager.Zoom;
+        var worldHeight = Game1._graphics.PreferredBackBufferHeight / CameraManager.Zoom;
+
+        _visibleCheckUpdate.CameraLeft = CameraManager.CameraPosition.X - (worldWidth / 2f);
+        _visibleCheckUpdate.CameraRight = CameraManager.CameraPosition.X + (worldWidth / 2f);
+        _visibleCheckUpdate.CameraTop = CameraManager.CameraPosition.Y - (worldHeight / 2f);
+        _visibleCheckUpdate.CameraBottom = CameraManager.CameraPosition.Y + (worldHeight / 2f);
+        
         _visibleCheckUpdate.VisibilityBuffer = _visibilityBuffer;
-        _visibleCheckUpdate.PreferredBackBufferWidth = Game1.CachedPreferredBackBufferWidth;
-        _visibleCheckUpdate.PreferredBackBufferHeight = Game1.CachedPreferredBackBufferHeight;
         _world.InlineParallelEntityQuery<VisibleCheckUpdate, Position, Sprite, Visible>(in _query, ref _visibleCheckUpdate);
     }
 }

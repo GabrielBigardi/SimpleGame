@@ -2,22 +2,28 @@
 using Arch.Buffer;
 using Arch.Core;
 using SimpleGame.Engine.ECS.Components;
+using SimpleGame.Engine.Managers;
 
 namespace SimpleGame.Engine.ECS.Systems.InlineQueries;
 
 public struct HiddenCheckUpdate : IForEachWithEntity<Position, Sprite>
 {
     public CommandBuffer VisibilityBuffer;
-    public int PreferredBackBufferWidth;
-    public int PreferredBackBufferHeight;
-    
+    public float CameraLeft;
+    public float CameraRight;
+    public float CameraTop;
+    public float CameraBottom;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Update(Entity entity, ref Position pos, ref Sprite spr)
     {
-        if (pos.Current.X + spr.HalfSize.X >= 100
-            && pos.Current.X - spr.HalfSize.X <= PreferredBackBufferWidth - 100
-            && pos.Current.Y + spr.HalfSize.Y >= 100
-            && pos.Current.Y - spr.HalfSize.Y <= PreferredBackBufferHeight - 100)
+        if (entity == Game1._player)
+            return;
+
+        if (pos.Current.X + spr.HalfSize.X >= CameraLeft
+            && pos.Current.X - spr.HalfSize.X <= CameraRight
+            && pos.Current.Y + spr.HalfSize.Y >= CameraTop
+            && pos.Current.Y - spr.HalfSize.Y <= CameraBottom)
         {
             VisibilityBuffer.Add<Visible>(entity);
         }

@@ -24,7 +24,8 @@ public class Game1 : Game
     private World _world;
     private JobScheduler _jobScheduler;
 
-    private readonly CommandBuffer _visibilityBuffer = new();
+    private readonly CommandBuffer _visibleBuffer = new();
+    private readonly CommandBuffer _hiddenBuffer = new();
     private readonly CommandBuffer _destroyBuffer = new();
 
     private VisibleCheckSystem _visibleSystem;
@@ -40,7 +41,8 @@ public class Game1 : Game
     #region Monogame
 
     private SpriteBatch _spriteBatch;
-
+    public static GraphicsDeviceManager _graphics;
+    
     #endregion
 
     #region Lighting
@@ -56,36 +58,30 @@ public class Game1 : Game
 
     #endregion
 
-    public static int CachedPreferredBackBufferWidth;
-    public static int CachedPreferredBackBufferHeight;
-
     public static Vector2 ScreenCenter =>
-        new(CachedPreferredBackBufferWidth / 2f, CachedPreferredBackBufferHeight / 2f);
+        new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
 
     private readonly Random _random = new();
-    private Entity _player;
+    public static Entity _player;
 
     public Game1()
     {
-        var graphics = new GraphicsDeviceManager(this);
+        _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
         IsMouseVisible = true;
 
-        graphics.PreferredBackBufferWidth = 1280;
-        graphics.PreferredBackBufferHeight = 720;
-
-        CachedPreferredBackBufferWidth = 1280;
-        CachedPreferredBackBufferHeight = 720;
+        _graphics.PreferredBackBufferWidth = 1280;
+        _graphics.PreferredBackBufferHeight = 720;
 
         // Unlimited FPS
-        graphics.SynchronizeWithVerticalRetrace = false;
+        _graphics.SynchronizeWithVerticalRetrace = false;
         IsFixedTimeStep = false;
 
         // Limited FPS
         // IsFixedTimeStep = true;
         // TargetElapsedTime = TimeSpan.FromSeconds(1d / 60d);
 
-        graphics.ApplyChanges();
+        _graphics.ApplyChanges();
     }
 
     protected override void Initialize()
@@ -103,8 +99,8 @@ public class Game1 : Game
 
         World.SharedJobScheduler = _jobScheduler;
 
-        _visibleSystem = new VisibleCheckSystem(_world, _visibilityBuffer);
-        _hiddenSystem = new HiddenCheckSystem(_world, _visibilityBuffer);
+        _visibleSystem = new VisibleCheckSystem(_world, _visibleBuffer);
+        _hiddenSystem = new HiddenCheckSystem(_world, _hiddenBuffer);
         _destroySystem = new EntityDestroySystem(_world, _destroyBuffer);
         _velocitySystem = new VelocitySystem(_world);
         _spriteFlipSystem = new SpriteFlipSystem(_world);
@@ -177,7 +173,7 @@ public class Game1 : Game
         MediaPlayer.Volume = 1f;
         MediaPlayer.Play(AssetManager.GameplaySong);
 
-        var scale = 2f;
+        var scale = 1f;
         var spriteSize = new[] { 16, 16 };
         var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
         var halfSize = origin * scale;
@@ -197,8 +193,8 @@ public class Game1 : Game
             new Shadow
             {
                 Texture = AssetManager.RoguelikeAtlas,
-                Scale = 1f,
-                Offset = new Vector2(0f, 16f),
+                Scale = scale,
+                Offset = new Vector2(0f, 8f),
                 //Origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f),
                 Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
                 Color = Color.Black * 0.5f
@@ -231,8 +227,8 @@ public class Game1 : Game
             Projection = Matrix.CreateOrthographicOffCenter
             (
                 0,
-                CachedPreferredBackBufferWidth,
-                CachedPreferredBackBufferHeight,
+                _graphics.PreferredBackBufferWidth,
+                _graphics.PreferredBackBufferHeight,
                 0,
                 0,
                 1
@@ -253,45 +249,67 @@ public class Game1 : Game
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
-        if (InputManager.LeftMousePressedThisFrame())
+        if (InputManager.IsLeftMouseDown())
         {
-            var bubblePopInstance = AssetManager.BubblePopSound.CreateInstance();
-            bubblePopInstance.Pitch = _random.NextFloat(-1f, 1f);
-            bubblePopInstance.Play();
+            //var bubblePopInstance = AssetManager.BubblePopSound.CreateInstance();
+            //bubblePopInstance.Pitch = _random.NextFloat(-1f, 1f);
+            //bubblePopInstance.Play();
 
             for (var i = 0; i < 10; i++)
             {
-                var randomX = _random.Next(100, CachedPreferredBackBufferWidth - 100);
-                var randomY = _random.Next(100, CachedPreferredBackBufferHeight - 100);
+                var randomX = _random.Next(100, _graphics.PreferredBackBufferWidth - 100);
+                var randomY = _random.Next(100, _graphics.PreferredBackBufferHeight - 100);
                 var pos = new Vector2(randomX, randomY);
 
                 var randomVelocity = VectorUtils.RandomInsideUnitCircle(_random);
                 randomVelocity.Normalize();
 
-                var scale = 2f;
+                var scale = 1f;
                 var randomColor = ColorUtils.RandomColor(_random);
                 var spriteSize = new[] { 16, 16 };
                 var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
                 var halfSize = origin * scale;
 
-                var monstersStartSource = new ValueTuple<int, int>(64, 496);
-                var spritesSourceList = new List<(int, int)>();
-                for (int x = 0; x < 10; x++)
+                var monstersConfigList = new List<Tuple<int, int, int>>()
                 {
-                    for (int y = 0; y < 3; y++)
-                    {
-                        var bla = new ValueTuple<int, int>(monstersStartSource.Item1 + spriteSize[0] * x,
-                            monstersStartSource.Item2 + spriteSize[0] * y);
-                        spritesSourceList.Add(bla);
-                    }
-                }
+                    new (64, 496, 4), // Slime
+                    new (80, 496, 8), // Goblin
+                    new (96, 496, 8), // Planta
+                    new (112, 496, 8), // ?
+                    new (128, 496, 8), // Sereia
+                    new (144, 496, 8), // Gargoyle
+                    new (160, 496, 8), // Mimic
+                    new (176, 496, 8), // Tree
+                    new (192, 496, 8), // Reaper
+                    new (208, 496, 8), // Mula
+                    new (64, 512, 8), // DragaoGreen
+                    new (80, 512, 8), // DragaoRed
+                    new (96, 512, 8), // DragaoBlue
+                    new (112, 512, 8), // Skeleton
+                    new (128, 512, 8), // Crab
+                    new (144, 512, 8), // Reaper2
+                    new (160, 512, 8), // ?
+                    new (176, 512, 8), // Eye
+                    new (192, 512, 8), // Sereia2
+                    new (208, 512, 8), // Imp
+                    new (64, 528, 8), // Minotaur
+                    new (80, 528, 8), // Goblin2
+                    new (96, 528, 8), // Goblin3
+                    new (112, 528, 8), // Shadow
+                    new (128, 528, 8), // ?
+                    new (144, 528, 8), // ?
+                    new (160, 528, 8), // ?
+                    new (176, 528, 8), // ?
+                    new (192, 528, 8), // Skull
+                    new (208, 528, 8), // MulaHumana
+                };
 
-                var spriteToUse = spritesSourceList[_random.Next(spritesSourceList.Count)];
+                var spriteToUse = monstersConfigList[_random.Next(monstersConfigList.Count)];
 
                 // Create monster
                 _world.Create(
                     new Position { Current = pos },
-                    new Velocity { Current = randomVelocity * 1f },
+                    new Velocity { Current = randomVelocity * 4f },
                     new Sprite
                     {
                         Texture = AssetManager.RoguelikeAtlas,
@@ -304,15 +322,15 @@ public class Game1 : Game
                     new Shadow
                     {
                         Texture = AssetManager.RoguelikeAtlas,
-                        Scale = 1f,
-                        Offset = new Vector2(0f, 16f),
+                        Scale = scale,
+                        Offset = new Vector2(0f, spriteToUse.Item3),
                         //Origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f),
                         Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
                         Color = Color.Black * 0.5f
                     },
                     new LightSource()
                     {
-                        Color = Color.Purple * 1f,
+                        Color = Color.White * 1f,
                         Origin = new(AssetManager.LightGradientTexture.Width * 0.5f,
                             AssetManager.LightGradientTexture.Height * 0.5f),
                         Scale = 4f
@@ -369,7 +387,8 @@ public class Game1 : Game
         _destroySystem.Update();
         _spriteFlipSystem.Update();
 
-        _visibilityBuffer.Playback(_world);
+        _visibleBuffer.Playback(_world);
+        _hiddenBuffer.Playback(_world);
         _destroyBuffer.Playback(_world);
 
         base.Update(gameTime);
@@ -396,8 +415,8 @@ public class Game1 : Game
 
         _shadowEffect.World = Matrix.Identity;
         _shadowEffect.View = CameraManager.GetCameraMatrix();
-        _shadowEffect.Projection = Matrix.CreateOrthographicOffCenter(0, CachedPreferredBackBufferWidth,
-            CachedPreferredBackBufferHeight, 0, 0, 1);
+        _shadowEffect.Projection = Matrix.CreateOrthographicOffCenter(0, _graphics.PreferredBackBufferWidth,
+            _graphics.PreferredBackBufferHeight, 0, 0, 1);
 
         int stencilRef = 1; // Start at ID 1
 
@@ -515,7 +534,8 @@ public class Game1 : Game
         //    new Color(255, 0, 0, 24), 4f);
 
         var entitiesLabelText = "Entities:";
-        var entitiesCountText = $"{_world.Size}";
+        var visibleEntitiesCount = _world.CountEntities(new QueryDescription().WithAll<Visible>());
+        var entitiesCountText = $"{visibleEntitiesCount}/{_world.Size}";
         var drawScale = 2f;
 
         var entitiesLabelSize = AssetManager.Font.MeasureString(entitiesLabelText) * drawScale;
