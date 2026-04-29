@@ -17,9 +17,6 @@ public struct VisibleCheckUpdate : IForEachWithEntity<Position, Sprite, Visible>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Update(Entity entity, ref Position pos, ref Sprite spr, ref Visible visible)
     {
-        if (entity == Game1._player)
-            return;
-
         if (pos.Current.X + spr.HalfSize.X < CameraLeft
             || pos.Current.X - spr.HalfSize.X > CameraRight
             || pos.Current.Y + spr.HalfSize.Y < CameraTop

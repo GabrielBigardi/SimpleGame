@@ -41,7 +41,7 @@ public class Game1 : Game
     #region Monogame
 
     private SpriteBatch _spriteBatch;
-    public static GraphicsDeviceManager _graphics;
+    private GraphicsDeviceManager _graphics;
     
     #endregion
 
@@ -55,14 +55,12 @@ public class Game1 : Game
 
     private readonly DepthStencilState[] _writeStencilStates = new DepthStencilState[256];
     private readonly DepthStencilState[] _readStencilStates = new DepthStencilState[256];
-
     #endregion
 
-    public static Vector2 ScreenCenter =>
-        new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
+    private Vector2 ScreenCenter => new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
 
     private readonly Random _random = new();
-    public static Entity _player;
+    private Entity _player;
 
     public Game1()
     {
@@ -99,8 +97,8 @@ public class Game1 : Game
 
         World.SharedJobScheduler = _jobScheduler;
 
-        _visibleSystem = new VisibleCheckSystem(_world, _visibleBuffer);
-        _hiddenSystem = new HiddenCheckSystem(_world, _hiddenBuffer);
+        _visibleSystem = new VisibleCheckSystem(_world, _visibleBuffer, _graphics);
+        _hiddenSystem = new HiddenCheckSystem(_world, _hiddenBuffer, _graphics);
         _destroySystem = new EntityDestroySystem(_world, _destroyBuffer);
         _velocitySystem = new VelocitySystem(_world);
         _spriteFlipSystem = new SpriteFlipSystem(_world);
@@ -234,7 +232,7 @@ public class Game1 : Game
                 1
             ),
             View = Matrix.Identity,
-            World = CameraManager.GetCameraMatrix()
+            World = CameraManager.GetCameraMatrix(ScreenCenter)
         };
 
         CameraManager.SetCameraPosition(_player.Get<Position>().Current);
@@ -265,7 +263,7 @@ public class Game1 : Game
                 randomVelocity.Normalize();
 
                 var scale = 1f;
-                var randomColor = ColorUtils.RandomColor(_random);
+                //var randomColor = ColorUtils.RandomColor(_random);
                 var spriteSize = new[] { 16, 16 };
                 var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
                 var halfSize = origin * scale;
@@ -350,7 +348,7 @@ public class Game1 : Game
             explosionInstance.Play();
 
             var query = new QueryDescription().WithAll<Sprite>();
-            _world.Query(in query, (Entity entity, ref Sprite spr) =>
+            _world.Query(in query, entity =>
             {
                 if (entity != _player)
                     entity.Add<Destroy>();
@@ -399,7 +397,7 @@ public class Game1 : Game
         var ambientDarkness = DayTimeManager.CurrentLighting;
 
         DrawLightmapAndBasicLights(ambientDarkness);
-        DrawShadowEmittingLights(ambientDarkness);
+        DrawShadowEmittingLights();
         //DrawCutoutShadows(ambientDarkness);
 
         DrawGame();
@@ -409,19 +407,19 @@ public class Game1 : Game
         base.Draw(gameTime);
     }
 
-    private void DrawShadowEmittingLights(Color ambientDarkness)
+    private void DrawShadowEmittingLights()
     {
         var noColorWriteBlend = new BlendState { ColorWriteChannels = ColorWriteChannels.None };
 
         _shadowEffect.World = Matrix.Identity;
-        _shadowEffect.View = CameraManager.GetCameraMatrix();
+        _shadowEffect.View = CameraManager.GetCameraMatrix(ScreenCenter);
         _shadowEffect.Projection = Matrix.CreateOrthographicOffCenter(0, _graphics.PreferredBackBufferWidth,
             _graphics.PreferredBackBufferHeight, 0, 0, 1);
 
-        int stencilRef = 1; // Start at ID 1
+        var stencilRef = 1; // Start at ID 1
 
         var query = new QueryDescription().WithAll<Position, LightSource, ShadowEmitter>();
-        _world.Query(in query, (ref Position pos, ref LightSource light, ref ShadowEmitter emitter) =>
+        _world.Query(in query, (ref Position pos, ref LightSource light) =>
         {
             if (stencilRef > 255)
             {
@@ -434,22 +432,19 @@ public class Game1 : Game
             GraphicsDevice.BlendState = noColorWriteBlend;
             GraphicsDevice.RasterizerState = RasterizerState.CullNone;
 
-            float shadowLength = 2000f;
+            var shadowLength = 2000f;
 
-            foreach (var wall in _walls)
+            foreach (var (a, b) in _walls)
             {
-                Vector2 a = wall.A;
-                Vector2 b = wall.B;
-
-                Vector2 edge = b - a;
-                Vector2 normal = new Vector2(-edge.Y, edge.X);
+                var edge = b - a;
+                var normal = new Vector2(-edge.Y, edge.X);
 
                 if (Vector2.Dot(normal, pos.Current - a) <= 0) continue;
 
-                Vector2 dirA = Vector2.Normalize(a - pos.Current);
-                Vector2 dirB = Vector2.Normalize(b - pos.Current);
+                var dirA = Vector2.Normalize(a - pos.Current);
+                var dirB = Vector2.Normalize(b - pos.Current);
 
-                var verts = new VertexPositionColor[6]
+                var verts = new VertexPositionColor[]
                 {
                     new(new Vector3(a, 0), Color.White), new(new Vector3(b, 0), Color.White),
                     new(new Vector3(a + dirA * shadowLength, 0), Color.White),
@@ -466,7 +461,7 @@ public class Game1 : Game
 
             // Grab the PRE-CACHED read state for this ID
             _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp,
-                _readStencilStates[stencilRef], RasterizerState.CullNone, null, CameraManager.GetCameraMatrix());
+                _readStencilStates[stencilRef], RasterizerState.CullNone, null, CameraManager.GetCameraMatrix(ScreenCenter));
 
             _spriteBatch.Draw(AssetManager.LightGradientTexture, pos.Current, null, light.Color, 0f, light.Origin,
                 light.Scale, SpriteEffects.None, 0f);
@@ -485,8 +480,7 @@ public class Game1 : Game
         GraphicsDevice.Clear(ClearOptions.Target | ClearOptions.Stencil, ambientDarkness, 0, 0);
 
         // Draw lights in a additive way
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp, null, null, null, CameraManager.GetCameraMatrix());
-
+        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp, null, null, null, CameraManager.GetCameraMatrix(ScreenCenter));
         _lightDrawSystem.Update();
 
         _spriteBatch.End();
@@ -497,8 +491,7 @@ public class Game1 : Game
         GraphicsDevice.SetRenderTarget(null);
         GraphicsDevice.Clear(new(59, 48, 78));
 
-        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp,
-            transformMatrix: CameraManager.GetCameraMatrix());
+        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, transformMatrix: CameraManager.GetCameraMatrix(ScreenCenter));
         _spriteDrawSystem.Update();
 
         foreach (var wall in _walls)

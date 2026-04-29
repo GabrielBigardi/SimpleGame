@@ -17,9 +17,6 @@ public struct HiddenCheckUpdate : IForEachWithEntity<Position, Sprite>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Update(Entity entity, ref Position pos, ref Sprite spr)
     {
-        if (entity == Game1._player)
-            return;
-
         if (pos.Current.X + spr.HalfSize.X >= CameraLeft
             && pos.Current.X - spr.HalfSize.X <= CameraRight
             && pos.Current.Y + spr.HalfSize.Y >= CameraTop

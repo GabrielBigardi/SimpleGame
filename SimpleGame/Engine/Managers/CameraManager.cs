@@ -16,13 +16,12 @@ public static class CameraManager
         set => _zoom = Math.Clamp(value, 0.1f, 10f); // prevent crazy values
     }
     
-    public static Matrix GetCameraMatrix()
+    public static Matrix GetCameraMatrix(Vector2 screenCenter)
     {
         return
             Matrix.CreateTranslation(new Vector3(-_cameraPosition, 0f)) *
             Matrix.CreateScale(_zoom, _zoom, 1f) *
-            Matrix.CreateTranslation(new Vector3(
-                Game1.ScreenCenter + ShakeManager.ShakeOffset, 0f));
+            Matrix.CreateTranslation(new Vector3(screenCenter + ShakeManager.ShakeOffset, 0f));
     }
 
     public static void SetCameraPosition(Vector2 position)
