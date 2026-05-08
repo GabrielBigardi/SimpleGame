@@ -1,66 +1,41 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using Arch.Buffer;
-using Arch.Core;
-using Arch.Core.Extensions;
+using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using Microsoft.Xna.Framework.Media;
-using Schedulers;
-using SimpleGame.Engine;
-using SimpleGame.Engine.ECS.Components;
-using SimpleGame.Engine.ECS.Systems;
 using SimpleGame.Engine.Managers;
-using SimpleGame.Engine.Utils;
+using SimpleGame.Engine.Testing;
 
 namespace SimpleGame;
 
 public class Game1 : Game
 {
-    #region ECS
-
-    private World _world;
-    private JobScheduler _jobScheduler;
-
-    private readonly CommandBuffer _visibleBuffer = new();
-    private readonly CommandBuffer _hiddenBuffer = new();
-    private readonly CommandBuffer _destroyBuffer = new();
-
-    private VisibleCheckSystem _visibleSystem;
-    private HiddenCheckSystem _hiddenSystem;
-    private SpriteDrawSystem _spriteDrawSystem;
-    private LightDrawSystem _lightDrawSystem;
-    private VelocitySystem _velocitySystem;
-    private EntityDestroySystem _destroySystem;
-    private SpriteFlipSystem _spriteFlipSystem;
-
-    #endregion
-
     #region Monogame
 
     private SpriteBatch _spriteBatch;
     private GraphicsDeviceManager _graphics;
-    
+
     #endregion
 
-    #region Lighting
-
-    private RenderTarget2D _lightMaskTarget;
-
-    // Shadows
-    private readonly List<(Vector2 A, Vector2 B)> _walls = [];
-    private BasicEffect _shadowEffect;
-
-    private readonly DepthStencilState[] _writeStencilStates = new DepthStencilState[256];
-    private readonly DepthStencilState[] _readStencilStates = new DepthStencilState[256];
-    #endregion
-
-    private Vector2 ScreenCenter => new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
+    private Vector2 ScreenCenter =>
+        new(_graphics.PreferredBackBufferWidth / 2f, _graphics.PreferredBackBufferHeight / 2f);
 
     private readonly Random _random = new();
-    private Entity _player;
+
+
+    private VertexBuffer _quadVertexBuffer;
+    private IndexBuffer _quadIndexBuffer;
+    private DynamicVertexBuffer _instanceBuffer;
+    private VertexBufferBinding[] _bindings;
+
+    // Sprite Data
+    private const int SpriteCount = 500_000; // Half a million for this test
+    private InstanceData[] _instances;
+    private Vector2[] _velocities; // Kept separate from the struct to save GPU bandwidth
+
+    // Camera
+    private Matrix _viewProjection;
+
 
     public Game1()
     {
@@ -84,475 +59,188 @@ public class Game1 : Game
 
     protected override void Initialize()
     {
-        _world = World.Create();
-
-        _jobScheduler = new JobScheduler(
-            new JobScheduler.Config
-            {
-                ThreadPrefixName = "SimpleGame",
-            }
-        );
-
-        Console.WriteLine(_jobScheduler.ThreadCount);
-
-        World.SharedJobScheduler = _jobScheduler;
-
-        _visibleSystem = new VisibleCheckSystem(_world, _visibleBuffer, _graphics);
-        _hiddenSystem = new HiddenCheckSystem(_world, _hiddenBuffer, _graphics);
-        _destroySystem = new EntityDestroySystem(_world, _destroyBuffer);
-        _velocitySystem = new VelocitySystem(_world);
-        _spriteFlipSystem = new SpriteFlipSystem(_world);
+        // Setup a simple 2D Orthographic Camera matching the screen size
+        Matrix projection = Matrix.CreateOrthographicOffCenter(0, _graphics.PreferredBackBufferWidth,
+            _graphics.PreferredBackBufferHeight, 0, 0, 1);
+        Matrix view = Matrix.Identity;
+        _viewProjection = view * projection;
 
         base.Initialize();
-
-        // If this is a AOT build add components to arrayregistry
-        if (!RuntimeFeature.IsDynamicCodeSupported)
-        {
-            ArrayRegistry.Add<Destroy>();
-            ArrayRegistry.Add<LightSource>();
-            ArrayRegistry.Add<Position>();
-            ArrayRegistry.Add<Shadow>();
-            ArrayRegistry.Add<ShadowEmitter>();
-            ArrayRegistry.Add<Sprite>();
-            ArrayRegistry.Add<Velocity>();
-            ArrayRegistry.Add<Visible>();
-        }
     }
 
     protected override void LoadContent()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _spriteDrawSystem = new SpriteDrawSystem(_world, _spriteBatch);
-        _lightDrawSystem = new LightDrawSystem(_world, _spriteBatch);
-
-        // Initialize light mask
-        var presentationParameters = GraphicsDevice.PresentationParameters;
-
-        //_lightMaskTarget = new RenderTarget2D(GraphicsDevice, presentationParameters.BackBufferWidth, presentationParameters.BackBufferHeight, mipMap: false, SurfaceFormat.Color, DepthFormat.None, 0, RenderTargetUsage.PreserveContents);
-
-        _lightMaskTarget = new RenderTarget2D(
-            GraphicsDevice,
-            presentationParameters.BackBufferWidth,
-            presentationParameters.BackBufferHeight,
-            false,
-            SurfaceFormat.Color,
-            DepthFormat.Depth24Stencil8, // <--- CRITICAL: Enables the Stencil Buffer
-            0,
-            RenderTargetUsage.PreserveContents
-        );
-
-        // Generate our 255 stencil states once during load
-        for (int i = 0; i < 256; i++)
-        {
-            _writeStencilStates[i] = new DepthStencilState
-            {
-                StencilEnable = true,
-                StencilFunction = CompareFunction.Always,
-                StencilPass = StencilOperation.Replace,
-                ReferenceStencil = i,
-                DepthBufferEnable = false
-            };
-
-            _readStencilStates[i] = new DepthStencilState
-            {
-                StencilEnable = true,
-                StencilFunction = CompareFunction.NotEqual,
-                ReferenceStencil = i,
-                DepthBufferEnable = false
-            };
-        }
 
         AssetManager.Load(Content);
 #if DEBUG
         AssetManager.InitializeHotReload();
 #endif
 
-        MediaPlayer.IsRepeating = true;
-        MediaPlayer.Volume = 1f;
-        MediaPlayer.Play(AssetManager.GameplaySong);
+        Vector2 atlasSize = new Vector2(AssetManager.RoguelikeAtlas.Width, AssetManager.RoguelikeAtlas.Height);
 
-        var scale = 1f;
-        var spriteSize = new[] { 16, 16 };
-        var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
-        var halfSize = origin * scale;
-
-        _player = _world.Create(
-            new Position { Current = ScreenCenter },
-            new Velocity(),
-            new Sprite
-            {
-                Texture = AssetManager.RoguelikeAtlas,
-                Scale = Vector2.One * scale,
-                Color = Color.White,
-                Origin = origin,
-                Source = new Rectangle(176, 544, spriteSize[0], spriteSize[1]),
-                HalfSize = halfSize
-            },
-            new Shadow
-            {
-                Texture = AssetManager.RoguelikeAtlas,
-                Scale = scale,
-                Offset = new Vector2(0f, 8f),
-                //Origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f),
-                Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
-                Color = Color.Black * 0.5f
-            },
-            new LightSource()
-            {
-                Scale = 4f,
-                Color = Color.White,
-                Origin = new(AssetManager.LightGradientTexture.Width * 0.5f,
-                    AssetManager.LightGradientTexture.Height * 0.5f)
-            },
-            new ShadowEmitter(),
-            new Visible()
-        );
-
-        var topLeft = new Vector2(400, 300);
-        var topRight = new Vector2(600, 300);
-        var bottomLeft = new Vector2(400, 500);
-        var bottomRight = new Vector2(600, 500);
-
-        _walls.Add((topLeft, bottomLeft)); // Left edge (going down)
-        _walls.Add((bottomLeft, bottomRight)); // Bottom edge (going right)
-        _walls.Add((bottomRight, topRight)); // Right edge (going up)
-        _walls.Add((topRight, topLeft)); // Top edge (going left)
-
-        // Init shadow effect
-        _shadowEffect = new BasicEffect(GraphicsDevice)
+        // 1. Setup Base Quad Geometry
+        VertexPositionTexture[] quadVertices = new VertexPositionTexture[]
         {
-            VertexColorEnabled = true,
-            Projection = Matrix.CreateOrthographicOffCenter
-            (
-                0,
-                _graphics.PreferredBackBufferWidth,
-                _graphics.PreferredBackBufferHeight,
-                0,
-                0,
-                1
-            ),
-            View = Matrix.Identity,
-            World = CameraManager.GetCameraMatrix(ScreenCenter)
+            new VertexPositionTexture(new Vector3(-0.5f, -0.5f, 0), new Vector2(0, 1)),
+            new VertexPositionTexture(new Vector3(-0.5f, 0.5f, 0), new Vector2(0, 0)),
+            new VertexPositionTexture(new Vector3(0.5f, -0.5f, 0), new Vector2(1, 1)),
+            new VertexPositionTexture(new Vector3(0.5f, 0.5f, 0), new Vector2(1, 0))
         };
 
-        CameraManager.SetCameraPosition(_player.Get<Position>().Current);
+        short[] quadIndices = new short[] { 0, 1, 2, 1, 3, 2 };
+
+        _quadVertexBuffer = new VertexBuffer(GraphicsDevice, typeof(VertexPositionTexture), 4, BufferUsage.WriteOnly);
+        _quadVertexBuffer.SetData(quadVertices);
+
+        _quadIndexBuffer = new IndexBuffer(GraphicsDevice, typeof(short), 6, BufferUsage.WriteOnly);
+        _quadIndexBuffer.SetData(quadIndices);
+
+        // 2. Setup Instance Buffer & Bindings
+        _instanceBuffer =
+            new DynamicVertexBuffer(GraphicsDevice, typeof(InstanceData), SpriteCount, BufferUsage.WriteOnly);
+
+        _bindings = new VertexBufferBinding[2];
+        _bindings[0] = new VertexBufferBinding(_quadVertexBuffer);
+        _bindings[1] = new VertexBufferBinding(_instanceBuffer, 0, 1); // Advance once per instance
+
+        // 3. Populate Initial Sprite Data
+        _instances = new InstanceData[SpriteCount];
+        _velocities = new Vector2[SpriteCount];
+        Random rng = new Random();
+
+        // Define your sub-grid properties
+        int spriteWidth = 16;
+        int spriteHeight = 16;
+        int atlasStartX = 64;
+        int atlasStartY = 448;
+        int gridColumns = 10;
+        int gridRows = 7;
+
+        for (int i = 0; i < SpriteCount; i++)
+        {
+            // Random position on screen
+            _instances[i].Position = new Vector2(
+                rng.Next(0, _graphics.PreferredBackBufferWidth),
+                rng.Next(0, _graphics.PreferredBackBufferHeight)
+            );
+
+            // 1. Pick a random column (0 to 9) and row (0 to 6)
+            int randomColumn = rng.Next(0, gridColumns);
+            int randomRow = rng.Next(0, gridRows);
+
+            // 2. Calculate the exact pixel coordinates on the atlas
+            int pixelX = atlasStartX + (randomColumn * spriteWidth);
+            int pixelY = atlasStartY + (randomRow * spriteHeight);
+
+            // 3. Create the source rectangle and convert to UVs
+            Rectangle sourceRect = new Rectangle(pixelX, pixelY, spriteWidth, spriteHeight);
+
+            _instances[i].UV = GetUVsFromRectangle(sourceRect, atlasSize);
+            _instances[i].Scale = new Vector2(spriteWidth, spriteHeight);
+            _instances[i].Color = Color.White;
+            
+            // 1. Get a random direction between -1.0 and 1.0
+            Vector2 randomDirection = new Vector2(
+                (float)rng.NextDouble() * 2 - 1, 
+                (float)rng.NextDouble() * 2 - 1
+            );
+
+            // 2. Normalize it so diagonal movement isn't faster than cardinal movement
+            if (randomDirection != Vector2.Zero)
+                randomDirection.Normalize();
+
+            // 3. Define a speed in Pixels Per Second (e.g., 150 to 300)
+            float speedInPixelsPerSecond = rng.Next(50, 100);
+
+            // Give it a random velocity for the update loop
+            _velocities[i] = randomDirection * speedInPixelsPerSecond;
+        }
     }
 
     protected override void Update(GameTime gameTime)
     {
-        if (!IsActive)
-            return;
-
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
-
-        if (InputManager.IsLeftMouseDown())
-        {
-            //var bubblePopInstance = AssetManager.BubblePopSound.CreateInstance();
-            //bubblePopInstance.Pitch = _random.NextFloat(-1f, 1f);
-            //bubblePopInstance.Play();
-
-            for (var i = 0; i < 10; i++)
-            {
-                var randomX = _random.Next(100, _graphics.PreferredBackBufferWidth - 100);
-                var randomY = _random.Next(100, _graphics.PreferredBackBufferHeight - 100);
-                var pos = new Vector2(randomX, randomY);
-
-                var randomVelocity = VectorUtils.RandomInsideUnitCircle(_random);
-                randomVelocity.Normalize();
-
-                var scale = 1f;
-                //var randomColor = ColorUtils.RandomColor(_random);
-                var spriteSize = new[] { 16, 16 };
-                var origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f);
-                var halfSize = origin * scale;
-
-                var monstersConfigList = new List<Tuple<int, int, int>>()
-                {
-                    new (64, 496, 4), // Slime
-                    new (80, 496, 8), // Goblin
-                    new (96, 496, 8), // Planta
-                    new (112, 496, 8), // ?
-                    new (128, 496, 8), // Sereia
-                    new (144, 496, 8), // Gargoyle
-                    new (160, 496, 8), // Mimic
-                    new (176, 496, 8), // Tree
-                    new (192, 496, 8), // Reaper
-                    new (208, 496, 8), // Mula
-                    new (64, 512, 8), // DragaoGreen
-                    new (80, 512, 8), // DragaoRed
-                    new (96, 512, 8), // DragaoBlue
-                    new (112, 512, 8), // Skeleton
-                    new (128, 512, 8), // Crab
-                    new (144, 512, 8), // Reaper2
-                    new (160, 512, 8), // ?
-                    new (176, 512, 8), // Eye
-                    new (192, 512, 8), // Sereia2
-                    new (208, 512, 8), // Imp
-                    new (64, 528, 8), // Minotaur
-                    new (80, 528, 8), // Goblin2
-                    new (96, 528, 8), // Goblin3
-                    new (112, 528, 8), // Shadow
-                    new (128, 528, 8), // ?
-                    new (144, 528, 8), // ?
-                    new (160, 528, 8), // ?
-                    new (176, 528, 8), // ?
-                    new (192, 528, 8), // Skull
-                    new (208, 528, 8), // MulaHumana
-                };
-
-                var spriteToUse = monstersConfigList[_random.Next(monstersConfigList.Count)];
-
-                // Create monster
-                _world.Create(
-                    new Position { Current = pos },
-                    new Velocity { Current = randomVelocity * 4f },
-                    new Sprite
-                    {
-                        Texture = AssetManager.RoguelikeAtlas,
-                        Scale = Vector2.One * scale,
-                        Color = Color.White,
-                        Origin = origin,
-                        Source = new Rectangle(spriteToUse.Item1, spriteToUse.Item2, spriteSize[0], spriteSize[1]),
-                        HalfSize = halfSize
-                    },
-                    new Shadow
-                    {
-                        Texture = AssetManager.RoguelikeAtlas,
-                        Scale = scale,
-                        Offset = new Vector2(0f, spriteToUse.Item3),
-                        //Origin = new Vector2(spriteSize[0] * 0.5f, spriteSize[1] * 0.5f),
-                        Source = new Rectangle(192, 416, spriteSize[0], spriteSize[1]),
-                        Color = Color.Black * 0.5f
-                    },
-                    new LightSource()
-                    {
-                        Color = Color.White * 1f,
-                        Origin = new(AssetManager.LightGradientTexture.Width * 0.5f,
-                            AssetManager.LightGradientTexture.Height * 0.5f),
-                        Scale = 4f
-                    },
-                    //new ShadowEmitter(),
-                    new Visible()
-                );
-            }
-        }
-
-        if (InputManager.RightMousePressedThisFrame())
-        {
-            ShakeManager.Shake(0.3f, 10f);
-
-            var explosionInstance = AssetManager.ExplosionSound.CreateInstance();
-            explosionInstance.Pitch = _random.NextFloat(-0.575f, 0.2f);
-            explosionInstance.Play();
-
-            var query = new QueryDescription().WithAll<Sprite>();
-            _world.Query(in query, entity =>
-            {
-                if (entity != _player)
-                    entity.Add<Destroy>();
-            });
-        }
-
-        _player.Get<Velocity>().Current = InputManager.NormalizedPlayerInput * 100f;
-
-        //_cameraPosition = _player.Get<Position>().Current;
-        CameraManager.SetCameraPosition(Vector2.Lerp(
-            CameraManager.CameraPosition,
-            _player.Get<Position>().Current,
-            10f * TimeManager.DeltaTime
-        ));
-
-        TimeManager.Update(gameTime);
-        InputManager.Update();
-        DayTimeManager.Update(TimeManager.DeltaTime);
-        ShakeManager.Update(_random);
 
 #if DEBUG
         if (AssetManager.NeedsReload)
         {
             AssetManager.PerformReload();
-
-            var query = new QueryDescription().WithAll<Sprite>();
-            _world.Query(in query, (ref Sprite spr) => { spr.Texture = AssetManager.RoguelikeAtlas; });
         }
 #endif
 
-        _velocitySystem.Update();
-        _visibleSystem.Update();
-        _hiddenSystem.Update();
-        _destroySystem.Update();
-        _spriteFlipSystem.Update();
+        int screenWidth = _graphics.PreferredBackBufferWidth;
+        int screenHeight = _graphics.PreferredBackBufferHeight;
 
-        _visibleBuffer.Playback(_world);
-        _hiddenBuffer.Playback(_world);
-        _destroyBuffer.Playback(_world);
+        // Use Parallel.For to multithread the CPU update loop for massive numbers
+        Parallel.For(0, SpriteCount, i =>
+        {
+            _instances[i].Position += _velocities[i] * (float)gameTime.ElapsedGameTime.TotalSeconds;
+
+            // Simple screen bounce logic
+            if (_instances[i].Position.X < 0 || _instances[i].Position.X > screenWidth) _velocities[i].X *= -1;
+            if (_instances[i].Position.Y < 0 || _instances[i].Position.Y > screenHeight) _velocities[i].Y *= -1;
+        });
+
+        // Push the updated positions to the GPU
+        // SetDataOptions.Discard is crucial here to prevent the CPU from stalling while waiting for the GPU
+        _instanceBuffer.SetData(_instances, 0, SpriteCount, SetDataOptions.Discard);
 
         base.Update(gameTime);
     }
 
     protected override void Draw(GameTime gameTime)
     {
-        var ambientDarkness = DayTimeManager.CurrentLighting;
+        GraphicsDevice.Clear(Color.Black);
 
-        DrawLightmapAndBasicLights(ambientDarkness);
-        DrawShadowEmittingLights();
-        //DrawCutoutShadows(ambientDarkness);
+        // 1. Tell the GPU to use our custom buffers
+        GraphicsDevice.SetVertexBuffers(_bindings);
+        GraphicsDevice.Indices = _quadIndexBuffer;
 
-        DrawGame();
-        DrawBlendedLightmap();
-        DrawUI();
+        // 2. Set Shader Parameters
+        AssetManager.InstancingEffect.Parameters["ViewProjection"].SetValue(_viewProjection);
+        AssetManager.InstancingEffect.Parameters["SpriteTexture"].SetValue(AssetManager.RoguelikeAtlas);
 
-        base.Draw(gameTime);
-    }
+        // 3. Disable depth tracking and enable alpha blending (if your sprites have transparency)
+        GraphicsDevice.DepthStencilState = DepthStencilState.None;
+        GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+        GraphicsDevice.RasterizerState = RasterizerState.CullNone;
 
-    private void DrawShadowEmittingLights()
-    {
-        var noColorWriteBlend = new BlendState { ColorWriteChannels = ColorWriteChannels.None };
-
-        _shadowEffect.World = Matrix.Identity;
-        _shadowEffect.View = CameraManager.GetCameraMatrix(ScreenCenter);
-        _shadowEffect.Projection = Matrix.CreateOrthographicOffCenter(0, _graphics.PreferredBackBufferWidth,
-            _graphics.PreferredBackBufferHeight, 0, 0, 1);
-
-        var stencilRef = 1; // Start at ID 1
-
-        var query = new QueryDescription().WithAll<Position, LightSource, ShadowEmitter>();
-        _world.Query(in query, (ref Position pos, ref LightSource light) =>
+        // 4. Draw Half a Million Sprites in one call
+        foreach (EffectPass pass in AssetManager.InstancingEffect.CurrentTechnique.Passes)
         {
-            if (stencilRef > 255)
-            {
-                GraphicsDevice.Clear(ClearOptions.Stencil, Color.Transparent, 0, 0);
-                stencilRef = 1;
-            }
+            pass.Apply();
 
-            // Grab the PRE-CACHED write state for this ID
-            GraphicsDevice.DepthStencilState = _writeStencilStates[stencilRef];
-            GraphicsDevice.BlendState = noColorWriteBlend;
-            GraphicsDevice.RasterizerState = RasterizerState.CullNone;
-
-            var shadowLength = 2000f;
-
-            foreach (var (a, b) in _walls)
-            {
-                var edge = b - a;
-                var normal = new Vector2(-edge.Y, edge.X);
-
-                if (Vector2.Dot(normal, pos.Current - a) <= 0) continue;
-
-                var dirA = Vector2.Normalize(a - pos.Current);
-                var dirB = Vector2.Normalize(b - pos.Current);
-
-                var verts = new VertexPositionColor[]
-                {
-                    new(new Vector3(a, 0), Color.White), new(new Vector3(b, 0), Color.White),
-                    new(new Vector3(a + dirA * shadowLength, 0), Color.White),
-                    new(new Vector3(b, 0), Color.White), new(new Vector3(b + dirB * shadowLength, 0), Color.White),
-                    new(new Vector3(a + dirA * shadowLength, 0), Color.White),
-                };
-
-                foreach (var pass in _shadowEffect.CurrentTechnique.Passes)
-                {
-                    pass.Apply();
-                    GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleList, verts, 0, 2);
-                }
-            }
-
-            // Grab the PRE-CACHED read state for this ID
-            _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp,
-                _readStencilStates[stencilRef], RasterizerState.CullNone, null, CameraManager.GetCameraMatrix(ScreenCenter));
-
-            _spriteBatch.Draw(AssetManager.LightGradientTexture, pos.Current, null, light.Color, 0f, light.Origin,
-                light.Scale, SpriteEffects.None, 0f);
-
-            _spriteBatch.End();
-
-            // Increment the ID for the next light!
-            stencilRef++;
-        });
-    }
-
-    private void DrawLightmapAndBasicLights(Color ambientDarkness)
-    {
-        // Clear lightmap/stencil buffer
-        GraphicsDevice.SetRenderTarget(_lightMaskTarget);
-        GraphicsDevice.Clear(ClearOptions.Target | ClearOptions.Stencil, ambientDarkness, 0, 0);
-
-        // Draw lights in a additive way
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendState.Additive, SamplerState.LinearClamp, null, null, null, CameraManager.GetCameraMatrix(ScreenCenter));
-        _lightDrawSystem.Update();
-
-        _spriteBatch.End();
-    }
-
-    private void DrawGame()
-    {
-        GraphicsDevice.SetRenderTarget(null);
-        GraphicsDevice.Clear(new(59, 48, 78));
-
-        _spriteBatch.Begin(SpriteSortMode.FrontToBack, BlendState.AlphaBlend, SamplerState.PointClamp, transformMatrix: CameraManager.GetCameraMatrix(ScreenCenter));
-        _spriteDrawSystem.Update();
-
-        foreach (var wall in _walls)
-        {
-            _spriteBatch.DrawLine(
-                wall.A,
-                wall.B,
-                Color.White,
-                3f
+            GraphicsDevice.DrawInstancedPrimitives(
+                PrimitiveType.TriangleList,
+                baseVertex: 0,
+                startIndex: 0,
+                primitiveCount: 2, // 2 triangles make our quad
+                instanceCount: SpriteCount
             );
         }
 
-        _spriteBatch.End();
+        base.Draw(gameTime);
+
+        //// Print FPS to the window title
+        //Window.Title = $"Sprites: {SpriteCount:N0} | FPS: {1f / gameTime.ElapsedGameTime.TotalSeconds:00.0}";
     }
 
-    private void DrawBlendedLightmap()
+    // Helper Method
+    private Vector4 GetUVsFromRectangle(Rectangle sourceRect, Vector2 atlasSize)
     {
-        _spriteBatch.Begin(SpriteSortMode.Deferred, BlendStates.MultiplyBlend, SamplerState.LinearClamp);
-        _spriteBatch.Draw(_lightMaskTarget, Vector2.Zero, _lightMaskTarget.Bounds, Color.White, 0f, Vector2.Zero, 1f,
-            SpriteEffects.None, 1f);
-        _spriteBatch.End();
-    }
-
-    private void DrawUI()
-    {
-        // Draw UI
-        _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-
-        // Debug
-        //_spriteBatch.DrawLine(new Vector2(ScreenCenter.X, 0f), new Vector2(ScreenCenter.X, ScreenCenter.Y * 2f),
-        //    new Color(255, 0, 0, 24), 4f);
-        //_spriteBatch.DrawLine(new Vector2(0f, ScreenCenter.Y), new Vector2(ScreenCenter.X * 2f, ScreenCenter.Y),
-        //    new Color(255, 0, 0, 24), 4f);
-
-        var entitiesLabelText = "Entities:";
-        var visibleEntitiesCount = _world.CountEntities(new QueryDescription().WithAll<Visible>());
-        var entitiesCountText = $"{visibleEntitiesCount}/{_world.Size}";
-        var drawScale = 2f;
-
-        var entitiesLabelSize = AssetManager.Font.MeasureString(entitiesLabelText) * drawScale;
-
-        _spriteBatch.DrawOutlinedString(
-            AssetManager.Font, entitiesLabelText, new Vector2(ScreenCenter.X, 10f),
-            Color.White, 0f,
-            FontUtils.CalculateFontOriginTopCenter(entitiesLabelText, AssetManager.Font), drawScale, SpriteEffects.None,
-            0f, OutlineFlags.Cross, Color.Black);
-
-        _spriteBatch.DrawOutlinedString(AssetManager.Font, entitiesCountText,
-            new Vector2(ScreenCenter.X, 10f + entitiesLabelSize.Y), Color.Red, 0f,
-            FontUtils.CalculateFontOriginTopCenter(entitiesCountText, AssetManager.Font), drawScale, SpriteEffects.None,
-            0f, OutlineFlags.Cross, Color.Black);
-
-
-        _spriteBatch.End();
+        return new Vector4(
+            sourceRect.X / atlasSize.X,
+            sourceRect.Y / atlasSize.Y,
+            sourceRect.Width / atlasSize.X,
+            sourceRect.Height / atlasSize.Y
+        );
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-
-        _jobScheduler.Dispose();
-        _world.Dispose();
     }
 }

@@ -19,6 +19,7 @@
         <PackageReference Include="MonoGame.Tool.FFprobe" Version="7.0.0.9"/>
     </ItemGroup>
     <ItemGroup>
+      <ClCompile Include="Assets\Shaders\InstancingShader.fx" />
       <ClCompile Include="Assets\Shaders\Outline.fx" />
     </ItemGroup>
 </Project>

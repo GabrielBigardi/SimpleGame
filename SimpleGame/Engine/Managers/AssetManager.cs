@@ -20,6 +20,9 @@ public static class AssetManager
     public static SoundEffect BubblePopSound;
     public static SoundEffect ExplosionSound;
     public static Song GameplaySong;
+
+
+    public static Effect InstancingEffect;
     
     public static bool NeedsReload { get; private set; }
     
@@ -54,6 +57,7 @@ public static class AssetManager
         BubblePopSound = Load<SoundEffect>("Sounds/BubblePop");
         ExplosionSound = Load<SoundEffect>("Sounds/Explosion");
         GameplaySong = Load<Song>("Sounds/Gameplay");
+        InstancingEffect =  Load<Effect>("Shaders/InstancingShader");
     }
     
     public static void Unload() => _content.Unload();
