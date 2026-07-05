@@ -5,6 +5,9 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using SimpleGame.Engine.Managers;
 using SimpleGame.Engine.Testing;
+using Arch.Core;
+using Schedulers;
+using SimpleGame.Engine; // <-- Added Arch namespace
 
 namespace SimpleGame;
 
@@ -22,20 +25,23 @@ public class Game1 : Game
 
     private readonly Random _random = new();
 
-
     private VertexBuffer _quadVertexBuffer;
     private IndexBuffer _quadIndexBuffer;
     private DynamicVertexBuffer _instanceBuffer;
     private VertexBufferBinding[] _bindings;
 
-    // Sprite Data
-    private const int SpriteCount = 500_000; // Half a million for this test
+    // Instance rendering buffer (Used just to ship data to the GPU)
+    private const int SpriteCount = 500_000;
     private InstanceData[] _instances;
-    private Vector2[] _velocities; // Kept separate from the struct to save GPU bandwidth
+    
+    // --- Arch ECS Data ---
+    private World _world;
+    private JobScheduler _jobScheduler;
+    private QueryDescription _movementQuery;
+    private QueryDescription _renderQuery;
 
     // Camera
     private Matrix _viewProjection;
-
 
     public Game1()
     {
@@ -50,20 +56,32 @@ public class Game1 : Game
         _graphics.SynchronizeWithVerticalRetrace = false;
         IsFixedTimeStep = false;
 
-        // Limited FPS
-        // IsFixedTimeStep = true;
-        // TargetElapsedTime = TimeSpan.FromSeconds(1d / 60d);
-
         _graphics.ApplyChanges();
     }
 
     protected override void Initialize()
     {
-        // Setup a simple 2D Orthographic Camera matching the screen size
         Matrix projection = Matrix.CreateOrthographicOffCenter(0, _graphics.PreferredBackBufferWidth,
             _graphics.PreferredBackBufferHeight, 0, 0, 1);
         Matrix view = Matrix.Identity;
         _viewProjection = view * projection;
+
+        // Initialize the Arch World
+        _world = World.Create();
+        _jobScheduler = new(
+            new JobScheduler.Config
+            {
+                ThreadPrefixName = "Arch.Samples",
+                ThreadCount = 0,                         
+                MaxExpectedConcurrentJobs = 64,
+                StrictAllocationMode = false,
+            }
+        );
+        World.SharedJobScheduler = _jobScheduler;
+        
+        // Pre-define our high-performance queries
+        _movementQuery = new QueryDescription().WithAll<InstanceData, Vector2>();
+        _renderQuery = new QueryDescription().WithAll<InstanceData>();
 
         base.Initialize();
     }
@@ -97,19 +115,15 @@ public class Game1 : Game
         _quadIndexBuffer.SetData(quadIndices);
 
         // 2. Setup Instance Buffer & Bindings
-        _instanceBuffer =
-            new DynamicVertexBuffer(GraphicsDevice, typeof(InstanceData), SpriteCount, BufferUsage.WriteOnly);
+        _instanceBuffer = new DynamicVertexBuffer(GraphicsDevice, typeof(InstanceData), SpriteCount, BufferUsage.WriteOnly);
 
         _bindings = new VertexBufferBinding[2];
         _bindings[0] = new VertexBufferBinding(_quadVertexBuffer);
-        _bindings[1] = new VertexBufferBinding(_instanceBuffer, 0, 1); // Advance once per instance
+        _bindings[1] = new VertexBufferBinding(_instanceBuffer, 0, 1);
 
-        // 3. Populate Initial Sprite Data
+        // 3. Populate Entities via Arch ECS
         _instances = new InstanceData[SpriteCount];
-        _velocities = new Vector2[SpriteCount];
-        Random rng = new Random();
-
-        // Define your sub-grid properties
+        
         int spriteWidth = 16;
         int spriteHeight = 16;
         int atlasStartX = 64;
@@ -119,42 +133,37 @@ public class Game1 : Game
 
         for (int i = 0; i < SpriteCount; i++)
         {
-            // Random position on screen
-            _instances[i].Position = new Vector2(
-                rng.Next(0, _graphics.PreferredBackBufferWidth),
-                rng.Next(0, _graphics.PreferredBackBufferHeight)
+            InstanceData instance = new InstanceData();
+            
+            instance.Position = new Vector2(
+                _random.Next(0, _graphics.PreferredBackBufferWidth),
+                _random.Next(0, _graphics.PreferredBackBufferHeight)
             );
 
-            // 1. Pick a random column (0 to 9) and row (0 to 6)
-            int randomColumn = rng.Next(0, gridColumns);
-            int randomRow = rng.Next(0, gridRows);
-
-            // 2. Calculate the exact pixel coordinates on the atlas
+            int randomColumn = _random.Next(0, gridColumns);
+            int randomRow = _random.Next(0, gridRows);
             int pixelX = atlasStartX + (randomColumn * spriteWidth);
             int pixelY = atlasStartY + (randomRow * spriteHeight);
 
-            // 3. Create the source rectangle and convert to UVs
             Rectangle sourceRect = new Rectangle(pixelX, pixelY, spriteWidth, spriteHeight);
 
-            _instances[i].UV = GetUVsFromRectangle(sourceRect, atlasSize);
-            _instances[i].Scale = new Vector2(spriteWidth, spriteHeight);
-            _instances[i].Color = Color.White;
+            instance.UV = GetUVsFromRectangle(sourceRect, atlasSize);
+            instance.Scale = new Vector2(spriteWidth, spriteHeight);
+            instance.Color = Color.White;
             
-            // 1. Get a random direction between -1.0 and 1.0
-            Vector2 randomDirection = new Vector2(
-                (float)rng.NextDouble() * 2 - 1, 
-                (float)rng.NextDouble() * 2 - 1
+            Vector2 velocity = new Vector2(
+                (float)_random.NextDouble() * 2 - 1, 
+                (float)_random.NextDouble() * 2 - 1
             );
 
-            // 2. Normalize it so diagonal movement isn't faster than cardinal movement
-            if (randomDirection != Vector2.Zero)
-                randomDirection.Normalize();
+            if (velocity != Vector2.Zero)
+                velocity.Normalize();
 
-            // 3. Define a speed in Pixels Per Second (e.g., 150 to 300)
-            float speedInPixelsPerSecond = rng.Next(50, 100);
+            float speedInPixelsPerSecond = _random.Next(50, 100);
+            velocity *= speedInPixelsPerSecond;
 
-            // Give it a random velocity for the update loop
-            _velocities[i] = randomDirection * speedInPixelsPerSecond;
+            // --- ARCH: Create the Entity and attach both components ---
+            _world.Create(instance, velocity);
         }
     }
 
@@ -171,22 +180,23 @@ public class Game1 : Game
         }
 #endif
 
+        float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
         int screenWidth = _graphics.PreferredBackBufferWidth;
         int screenHeight = _graphics.PreferredBackBufferHeight;
 
-        // Use Parallel.For to multithread the CPU update loop for massive numbers
-        Parallel.For(0, SpriteCount, i =>
-        {
-            _instances[i].Position += _velocities[i] * (float)gameTime.ElapsedGameTime.TotalSeconds;
-
-            // Simple screen bounce logic
-            if (_instances[i].Position.X < 0 || _instances[i].Position.X > screenWidth) _velocities[i].X *= -1;
-            if (_instances[i].Position.Y < 0 || _instances[i].Position.Y > screenHeight) _velocities[i].Y *= -1;
-        });
-
-        // Push the updated positions to the GPU
-        // SetDataOptions.Discard is crucial here to prevent the CPU from stalling while waiting for the GPU
-        _instanceBuffer.SetData(_instances, 0, SpriteCount, SetDataOptions.Discard);
+        // --- ARCH: Update System ---
+        // Arch handles the iteration sequentially but extremely fast due to CPU cache locality
+        var bla = new TestUpdate();
+        _world.InlineParallelQuery<TestUpdate, InstanceData, Vector2>(in _movementQuery, ref bla);
+        
+        //_world.ParallelQuery(in _movementQuery, (ref InstanceData instance, ref Vector2 velocity) =>
+        //{
+        //    instance.Position += velocity * dt;
+//
+        //    // Simple screen bounce logic
+        //    if (instance.Position.X < 0 || instance.Position.X > screenWidth) velocity.X *= -1;
+        //    if (instance.Position.Y < 0 || instance.Position.Y > screenHeight) velocity.Y *= -1;
+        //});
 
         base.Update(gameTime);
     }
@@ -194,6 +204,17 @@ public class Game1 : Game
     protected override void Draw(GameTime gameTime)
     {
         GraphicsDevice.Clear(Color.Black);
+
+        // --- ARCH: Extract System ---
+        // We need to copy the updated InstanceData from Arch into our MonoGame array
+        int index = 0;
+        _world.Query(in _renderQuery, (ref InstanceData instance) =>
+        {
+            _instances[index++] = instance;
+        });
+
+        // Push the extracted array to the GPU
+        _instanceBuffer.SetData(_instances, 0, SpriteCount, SetDataOptions.Discard);
 
         // 1. Tell the GPU to use our custom buffers
         GraphicsDevice.SetVertexBuffers(_bindings);
@@ -203,7 +224,7 @@ public class Game1 : Game
         AssetManager.InstancingEffect.Parameters["ViewProjection"].SetValue(_viewProjection);
         AssetManager.InstancingEffect.Parameters["SpriteTexture"].SetValue(AssetManager.RoguelikeAtlas);
 
-        // 3. Disable depth tracking and enable alpha blending (if your sprites have transparency)
+        // 3. Disable depth tracking and enable alpha blending
         GraphicsDevice.DepthStencilState = DepthStencilState.None;
         GraphicsDevice.BlendState = BlendState.NonPremultiplied;
         GraphicsDevice.RasterizerState = RasterizerState.CullNone;
@@ -217,15 +238,14 @@ public class Game1 : Game
                 PrimitiveType.TriangleList,
                 baseVertex: 0,
                 startIndex: 0,
-                primitiveCount: 2, // 2 triangles make our quad
+                primitiveCount: 2,
                 instanceCount: SpriteCount
             );
         }
 
         base.Draw(gameTime);
 
-        //// Print FPS to the window title
-        //Window.Title = $"Sprites: {SpriteCount:N0} | FPS: {1f / gameTime.ElapsedGameTime.TotalSeconds:00.0}";
+        Window.Title = $"Arch ECS | Sprites: {SpriteCount:N0} | FPS: {1f / gameTime.ElapsedGameTime.TotalSeconds:00.0}";
     }
 
     // Helper Method
@@ -241,6 +261,9 @@ public class Game1 : Game
 
     protected override void Dispose(bool disposing)
     {
+        // Don't forget to dispose the Arch World!
+        _world.Dispose();
+        _jobScheduler.Dispose();
         base.Dispose(disposing);
     }
 }
