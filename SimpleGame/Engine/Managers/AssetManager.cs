@@ -21,6 +21,7 @@ public static class AssetManager
     public static SoundEffect ExplosionSound;
     public static Song GameplaySong;
     public static Model PlaceholderModel;
+    public static Effect ShadowShader;
     
     public static bool NeedsReload { get; private set; }
     
@@ -56,6 +57,7 @@ public static class AssetManager
         ExplosionSound = Load<SoundEffect>("Sounds/Explosion");
         GameplaySong = Load<Song>("Sounds/Gameplay");
         PlaceholderModel = Load<Model>("Models/Placeholder");
+        ShadowShader = Load<Effect>("Shaders/ShadowShader");
     }
     
     public static void Unload() => _content.Unload();

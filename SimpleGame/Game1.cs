@@ -34,6 +34,15 @@ public class Game1 : Game
     
     #endregion
 
+    #region Lighting
+    
+    private RenderTarget2D _shadowMap;
+    private Vector3 _lightDirection = Vector3.Normalize(new Vector3(-1, -1, -1));
+    private Matrix _lightView;
+    private Matrix _lightProjection;
+    
+    #endregion
+    
     private Entity _player;
 
     public Game1()
@@ -68,7 +77,7 @@ public class Game1 : Game
 
         _destroySystem = new EntityDestroySystem(_world, _destroyBuffer);
         _velocitySystem = new VelocitySystem(_world);
-        _modelDrawSystem = new ModelDrawSystem(_world);
+        _modelDrawSystem = new ModelDrawSystem(_world, _graphics.GraphicsDevice);
 
         CameraManager.Initialize(_graphics);
 
@@ -92,6 +101,9 @@ public class Game1 : Game
         // Let's reset the depth buffer format just in case
         _graphics.PreferredDepthStencilFormat = DepthFormat.Depth24Stencil8;
         _graphics.ApplyChanges();
+        
+        // Create Shadow Map
+        _shadowMap = new RenderTarget2D(GraphicsDevice, 2048, 2048, false, SurfaceFormat.Single, DepthFormat.Depth24);
 
         AssetManager.Load(Content);
 
@@ -108,7 +120,7 @@ public class Game1 : Game
         );
         
         var player2 = _world.Create(
-            new Position { Current = Vector3.Zero },
+            new Position { Current = new Vector3(50, 0, 50) },
             new Rotation { Current = Vector3.Zero },
             new Velocity { Current = Vector3.Zero },
             new ModelComponent
@@ -147,6 +159,11 @@ public class Game1 : Game
         ));
         
         CameraManager.SetCameraPosition(CameraManager.CameraTarget + new Vector3(0, 150, 150)); // Follow player
+        
+        // Update Light Matrices
+        var lightPos = CameraManager.CameraTarget - _lightDirection * 500f;
+        _lightView = Matrix.CreateLookAt(lightPos, CameraManager.CameraTarget, Vector3.Up);
+        _lightProjection = Matrix.CreateOrthographic(1000f, 1000f, 1f, 2000f);
 
         TimeManager.Update(gameTime);
         InputManager.Update();
@@ -162,15 +179,37 @@ public class Game1 : Game
 
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, new Color(59, 48, 78), 1.0f, 0);
+        if (AssetManager.ShadowShader != null)
+        {
+            AssetManager.ShadowShader.Parameters["LightView"]?.SetValue(_lightView);
+            AssetManager.ShadowShader.Parameters["LightProjection"]?.SetValue(_lightProjection);
+            AssetManager.ShadowShader.Parameters["LightDirection"]?.SetValue(_lightDirection);
+        }
 
-        // Required for 3D models to render correctly with depth
+        // --- SHADOW PASS ---
+        GraphicsDevice.SetRenderTarget(_shadowMap);
+        GraphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, Color.White, 1.0f, 0);
+        GraphicsDevice.DepthStencilState = DepthStencilState.Default;
+        GraphicsDevice.BlendState = BlendState.Opaque;
+        // Optionally cull front faces for shadow maps to prevent acne
+        GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise; 
+        
+        _modelDrawSystem.DrawShadowMap();
+
+        // --- MAIN PASS ---
+        GraphicsDevice.SetRenderTarget(null);
+        GraphicsDevice.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, new Color(59, 48, 78), 1.0f, 0);
         GraphicsDevice.DepthStencilState = DepthStencilState.Default;
         GraphicsDevice.BlendState = BlendState.Opaque;
         GraphicsDevice.RasterizerState = RasterizerState.CullCounterClockwise;
         GraphicsDevice.SamplerStates[0] = SamplerState.LinearWrap;
 
-        _modelDrawSystem.Draw();
+        if (AssetManager.ShadowShader != null)
+        {
+            AssetManager.ShadowShader.Parameters["ShadowMap"]?.SetValue(_shadowMap);
+        }
+
+        _modelDrawSystem.DrawModels();
 
         DrawUI();
 
