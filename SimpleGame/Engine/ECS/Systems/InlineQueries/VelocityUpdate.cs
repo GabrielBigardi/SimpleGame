@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using Arch.Core;
 using SimpleGame.Engine.ECS.Components;
 
@@ -13,5 +13,6 @@ public struct VelocityUpdate : IForEach<Position, Velocity>
     {
         pos.Current.X += vel.Current.X * DeltaTime;
         pos.Current.Y += vel.Current.Y * DeltaTime;
+        pos.Current.Z += vel.Current.Z * DeltaTime;
     }
 }

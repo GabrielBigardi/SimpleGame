@@ -1,8 +1,8 @@
-﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework;
 
 namespace SimpleGame.Engine.ECS.Components;
 
 public struct Position
 {
-    public Vector2 Current;
+    public Vector3 Current;
 }

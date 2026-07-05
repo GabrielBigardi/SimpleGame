@@ -30,7 +30,7 @@
         </EmbeddedResource>
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Arch" Version="2.1.0-beta" />
-        <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5-preview.3" />
+        <PackageReference Include="Arch" Version="2.1.0" />
+        <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.5-preview.6" />
     </ItemGroup>
 </Project>

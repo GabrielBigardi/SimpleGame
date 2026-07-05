@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -20,6 +20,7 @@ public static class AssetManager
     public static SoundEffect BubblePopSound;
     public static SoundEffect ExplosionSound;
     public static Song GameplaySong;
+    public static Model PlaceholderModel;
     
     public static bool NeedsReload { get; private set; }
     
@@ -54,6 +55,7 @@ public static class AssetManager
         BubblePopSound = Load<SoundEffect>("Sounds/BubblePop");
         ExplosionSound = Load<SoundEffect>("Sounds/Explosion");
         GameplaySong = Load<Song>("Sounds/Gameplay");
+        PlaceholderModel = Load<Model>("Models/Placeholder");
     }
     
     public static void Unload() => _content.Unload();
