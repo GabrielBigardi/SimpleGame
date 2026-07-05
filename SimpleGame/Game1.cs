@@ -107,6 +107,17 @@ public class Game1 : Game
             }
         );
         
+        var player2 = _world.Create(
+            new Position { Current = Vector3.Zero },
+            new Rotation { Current = Vector3.Zero },
+            new Velocity { Current = Vector3.Zero },
+            new ModelComponent
+            {
+                Model = AssetManager.PlaceholderModel,
+                Scale = 1f
+            }
+        );
+        
         CameraManager.SetCameraTarget(_player.Get<Position>().Current);
     }
 
@@ -126,7 +137,7 @@ public class Game1 : Game
         // Update rotation slightly based on velocity
         if (input != Vector2.Zero)
         {
-            _player.Get<Rotation>().Current = new Vector3(0, MathF.Atan2(-input.X, -input.Y), 0);
+            _player.Get<Rotation>().Current = new Vector3(0, MathF.Atan2(input.X, input.Y), 0);
         }
 
         CameraManager.SetCameraTarget(Vector3.Lerp(

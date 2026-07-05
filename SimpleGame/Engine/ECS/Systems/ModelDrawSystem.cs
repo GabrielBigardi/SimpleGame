@@ -1,3 +1,4 @@
+using System.Linq;
 using Arch.Core;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -21,14 +22,23 @@ public class ModelDrawSystem
     {
         _world.Query(in _query, (ref Position pos, ref Rotation rot, ref ModelComponent modelComp) =>
         {
-            if (modelComp.Model == null) return;
-            
-            Matrix worldMatrix = Matrix.CreateScale(modelComp.Scale) * 
+            if (modelComp.Model == null)
+                return;
+
+            var worldMatrix = Matrix.CreateScale(modelComp.Scale) * 
                                  Matrix.CreateRotationX(rot.Current.X) * 
                                  Matrix.CreateRotationY(rot.Current.Y) * 
                                  Matrix.CreateRotationZ(rot.Current.Z) * 
                                  Matrix.CreateTranslation(pos.Current);
-                                 
+
+            foreach (var mesh in modelComp.Model.Meshes)
+            {
+                foreach (BasicEffect effect in mesh.Effects)
+                {
+                    effect.EnableDefaultLighting();
+                }
+            }
+
             modelComp.Model.Draw(worldMatrix, CameraManager.ViewMatrix, CameraManager.ProjectionMatrix);
         });
     }
